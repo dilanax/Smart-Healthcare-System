@@ -1,0 +1,27 @@
+package com.example.demo.service;
+
+import com.example.demo.dto.NotificationRequest;
+import com.example.demo.dto.NotificationStatusUpdateRequest;
+import com.example.demo.dto.NotificationSummaryResponse;
+import com.example.demo.entity.Notification;
+
+import java.util.List;
+
+public interface NotificationService {
+
+    List<Notification> getAllNotifications();
+
+    Notification getNotificationById(Long notificationId);
+
+    Notification createNotification(NotificationRequest request);
+
+    Notification updateNotification(Long notificationId, NotificationRequest request);
+
+    Notification updateStatus(Long notificationId, NotificationStatusUpdateRequest request);
+
+    Notification sendNotification(Long notificationId);
+
+    void deleteNotification(Long notificationId);
+
+    NotificationSummaryResponse getSummary();
+}
