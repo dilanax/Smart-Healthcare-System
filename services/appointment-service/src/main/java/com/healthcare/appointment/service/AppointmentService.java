@@ -24,9 +24,12 @@ public class AppointmentService {
         Appointment appointment = new Appointment();
         appointment.setPatientId(requestDto.getPatientId());
         appointment.setDoctorId(requestDto.getDoctorId());
+        appointment.setDoctorFirstName(requestDto.getDoctorFirstName());
+        appointment.setDoctorLastName(requestDto.getDoctorLastName());
         appointment.setAppointmentDate(requestDto.getAppointmentDate());
         appointment.setAppointmentTime(requestDto.getAppointmentTime());
         appointment.setReason(requestDto.getReason());
+        appointment.setToken(requestDto.getToken());
         appointment.setStatus(AppointmentStatus.PENDING);
 
         Appointment savedAppointment = appointmentRepository.save(appointment);
@@ -35,6 +38,13 @@ public class AppointmentService {
 
     public List<AppointmentResponseDto> getAllAppointments() {
         return appointmentRepository.findAll()
+                .stream()
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
+    }
+
+    public List<AppointmentResponseDto> getAppointmentsByPatientId(Long patientId) {
+        return appointmentRepository.findByPatientId(patientId)
                 .stream()
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
@@ -55,7 +65,11 @@ public class AppointmentService {
         appointment.setAppointmentDate(requestDto.getAppointmentDate());
         appointment.setAppointmentTime(requestDto.getAppointmentTime());
         appointment.setReason(requestDto.getReason());
-        appointment.setStatus(AppointmentStatus.RESCHEDULED);
+        
+        // If status is provided in the request, use it; otherwise keep existing status
+        if (requestDto.getStatus() != null) {
+            appointment.setStatus(requestDto.getStatus());
+        }
 
         Appointment updatedAppointment = appointmentRepository.save(appointment);
         return mapToResponse(updatedAppointment);
@@ -83,9 +97,12 @@ public class AppointmentService {
                 appointment.getId(),
                 appointment.getPatientId(),
                 appointment.getDoctorId(),
+                appointment.getDoctorFirstName(),
+                appointment.getDoctorLastName(),
                 appointment.getAppointmentDate(),
                 appointment.getAppointmentTime(),
                 appointment.getReason(),
+                appointment.getToken(),
                 appointment.getStatus(),
                 appointment.getCreatedAt(),
                 appointment.getUpdatedAt()

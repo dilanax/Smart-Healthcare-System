@@ -1,17 +1,22 @@
 package com.healthcare.appointment.dto;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.healthcare.appointment.model.AppointmentStatus;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 
 public class AppointmentResponseDto {
+    @JsonProperty("appointmentId")
     private Long id;
     private Long patientId;
     private Long doctorId;
+    private String doctorFirstName;
+    private String doctorLastName;
     private LocalDate appointmentDate;
     private LocalTime appointmentTime;
     private String reason;
+    private String token;
     private AppointmentStatus status;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
@@ -28,6 +33,23 @@ public class AppointmentResponseDto {
         this.appointmentDate = appointmentDate;
         this.appointmentTime = appointmentTime;
         this.reason = reason;
+        this.status = status;
+        this.createdAt = createdAt;
+        this.updatedAt = updatedAt;
+    }
+
+    public AppointmentResponseDto(Long id, Long patientId, Long doctorId, String doctorFirstName, String doctorLastName,
+                                  LocalDate appointmentDate, LocalTime appointmentTime, String reason, String token,
+                                  AppointmentStatus status, LocalDateTime createdAt, LocalDateTime updatedAt) {
+        this.id = id;
+        this.patientId = patientId;
+        this.doctorId = doctorId;
+        this.doctorFirstName = doctorFirstName;
+        this.doctorLastName = doctorLastName;
+        this.appointmentDate = appointmentDate;
+        this.appointmentTime = appointmentTime;
+        this.reason = reason;
+        this.token = token;
         this.status = status;
         this.createdAt = createdAt;
         this.updatedAt = updatedAt;
@@ -103,5 +125,29 @@ public class AppointmentResponseDto {
 
     public void setUpdatedAt(LocalDateTime updatedAt) {
         this.updatedAt = updatedAt;
+    }
+
+    public String getDoctorFirstName() {
+        return doctorFirstName;
+    }
+
+    public void setDoctorFirstName(String doctorFirstName) {
+        this.doctorFirstName = doctorFirstName;
+    }
+
+    public String getDoctorLastName() {
+        return doctorLastName;
+    }
+
+    public void setDoctorLastName(String doctorLastName) {
+        this.doctorLastName = doctorLastName;
+    }
+
+    public String getToken() {
+        return token;
+    }
+
+    public void setToken(String token) {
+        this.token = token;
     }
 }

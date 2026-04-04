@@ -15,9 +15,12 @@ public class Appointment {
 
     private Long patientId;
     private Long doctorId;
+    private String doctorFirstName;
+    private String doctorLastName;
     private LocalDate appointmentDate;
     private LocalTime appointmentTime;
     private String reason;
+    private String token;
 
     @Enumerated(EnumType.STRING)
     private AppointmentStatus status;
@@ -88,6 +91,30 @@ public class Appointment {
 
     public void setReason(String reason) {
         this.reason = reason;
+    }
+
+    public String getToken() {
+        return token;
+    }
+
+    public void setToken(String token) {
+        this.token = token;
+    }
+
+    public String getDoctorFirstName() {
+        return doctorFirstName;
+    }
+
+    public void setDoctorFirstName(String doctorFirstName) {
+        this.doctorFirstName = doctorFirstName;
+    }
+
+    public String getDoctorLastName() {
+        return doctorLastName;
+    }
+
+    public void setDoctorLastName(String doctorLastName) {
+        this.doctorLastName = doctorLastName;
     }
 
     public AppointmentStatus getStatus() {

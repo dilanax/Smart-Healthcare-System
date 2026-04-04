@@ -25,7 +25,10 @@ public class AppointmentController {
     }
 
     @GetMapping
-    public List<AppointmentResponseDto> getAllAppointments() {
+    public List<AppointmentResponseDto> getAllAppointments(@RequestParam(required = false) Long patientId) {
+        if (patientId != null) {
+            return appointmentService.getAppointmentsByPatientId(patientId);
+        }
         return appointmentService.getAllAppointments();
     }
 
@@ -48,6 +51,12 @@ public class AppointmentController {
     @PutMapping("/{id}/status")
     public AppointmentResponseDto updateAppointmentStatus(@PathVariable Long id,
                                                           @RequestBody AppointmentStatusUpdateDto dto) {
+        return appointmentService.updateAppointmentStatus(id, dto);
+    }
+
+    @PatchMapping("/{id}")
+    public AppointmentResponseDto patchAppointment(@PathVariable Long id,
+                                                    @RequestBody AppointmentStatusUpdateDto dto) {
         return appointmentService.updateAppointmentStatus(id, dto);
     }
 }
