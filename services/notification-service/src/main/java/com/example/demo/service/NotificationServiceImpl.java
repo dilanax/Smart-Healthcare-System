@@ -1,6 +1,7 @@
 package com.example.demo.service;
 
 import com.example.demo.dto.NotificationRequest;
+import com.example.demo.dto.NotificationReplyRequest;
 import com.example.demo.dto.NotificationStatusUpdateRequest;
 import com.example.demo.dto.NotificationSummaryResponse;
 import com.example.demo.entity.Notification;
@@ -56,6 +57,16 @@ public class NotificationServiceImpl implements NotificationService {
         Notification notification = getNotificationById(notificationId);
         notification.setStatus(request.getStatus());
         notification.setSentAt(request.getStatus() == NotificationStatus.SENT ? LocalDateTime.now() : null);
+        return notificationRepository.save(notification);
+    }
+
+    @Override
+    public Notification replyToNotification(Long notificationId, NotificationReplyRequest request) {
+        Notification notification = getNotificationById(notificationId);
+        notification.setReplyMessage(request.getReplyMessage().trim());
+        notification.setRepliedByName(request.getRepliedByName().trim());
+        notification.setRepliedByEmail(request.getRepliedByEmail().trim().toLowerCase());
+        notification.setRepliedAt(LocalDateTime.now());
         return notificationRepository.save(notification);
     }
 

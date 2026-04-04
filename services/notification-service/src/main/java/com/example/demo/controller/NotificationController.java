@@ -2,6 +2,7 @@ package com.example.demo.controller;
 
 import com.example.demo.dto.ApiResponse;
 import com.example.demo.dto.NotificationRequest;
+import com.example.demo.dto.NotificationReplyRequest;
 import com.example.demo.dto.NotificationStatusUpdateRequest;
 import com.example.demo.dto.NotificationSummaryResponse;
 import com.example.demo.entity.Notification;
@@ -59,6 +60,12 @@ public class NotificationController {
     public ApiResponse<Notification> updateStatus(@PathVariable Long notificationId,
                                                   @Valid @RequestBody NotificationStatusUpdateRequest request) {
         return ApiResponse.success("Notification status updated successfully.", notificationService.updateStatus(notificationId, request));
+    }
+
+    @PatchMapping("/{notificationId}/reply")
+    public ApiResponse<Notification> replyToNotification(@PathVariable Long notificationId,
+                                                         @Valid @RequestBody NotificationReplyRequest request) {
+        return ApiResponse.success("Notification reply submitted successfully.", notificationService.replyToNotification(notificationId, request));
     }
 
     @PostMapping("/{notificationId}/send")

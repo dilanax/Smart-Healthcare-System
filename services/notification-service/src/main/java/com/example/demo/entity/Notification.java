@@ -69,6 +69,15 @@ public class Notification {
 
     private LocalDateTime sentAt;
 
+    @Column(length = 2000)
+    private String replyMessage;
+
+    private String repliedByName;
+
+    private String repliedByEmail;
+
+    private LocalDateTime repliedAt;
+
     private LocalDateTime createdAt;
 
     private LocalDateTime updatedAt;

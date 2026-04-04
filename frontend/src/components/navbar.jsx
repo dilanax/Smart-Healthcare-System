@@ -1,10 +1,31 @@
-import React, { useState } from 'react';
-import { clearStoredUser } from '../lib/auth';
+import React, { useEffect, useMemo, useState } from 'react';
+import { clearStoredUser, fetchNotifications, replyToNotification } from '../lib/auth';
+
+const normalizeAudience = (value) => (value || '').trim().toUpperCase();
+
+const doesAudienceMatchRole = (audienceType, role) => {
+  const normalizedAudience = normalizeAudience(audienceType);
+  const normalizedRole = normalizeAudience(role);
+
+  if (!normalizedAudience || normalizedAudience === 'ALL') return true;
+  if (normalizedAudience === normalizedRole) return true;
+  if (normalizedAudience === `${normalizedRole}S`) return true;
+  if (normalizedRole === 'PATIENT' && normalizedAudience === 'PUBLIC') return true;
+
+  return false;
+};
 
 const Navbar = ({ navigate, currentUser }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [activeLink, setActiveLink] = useState('home');
   const [showProfileModal, setShowProfileModal] = useState(false);
+  const [showNotificationPanel, setShowNotificationPanel] = useState(false);
+  const [notificationsLoading, setNotificationsLoading] = useState(false);
+  const [notificationsError, setNotificationsError] = useState('');
+  const [notifications, setNotifications] = useState([]);
+  const [seenNotificationIds, setSeenNotificationIds] = useState([]);
+  const [replyDrafts, setReplyDrafts] = useState({});
+  const [replySubmittingId, setReplySubmittingId] = useState(null);
 
   const navLinks = [
     { id: 'home', label: 'Home', icon: 'fas fa-home' },
@@ -17,6 +38,65 @@ const Navbar = ({ navigate, currentUser }) => {
   const isAdmin = currentUser?.role === 'ADMIN';
   const isDoctor = currentUser?.role === 'DOCTOR';
   const isPatient = currentUser?.role === 'PATIENT';
+  const isDashboardUser = isAdmin || isDoctor || isPatient;
+  const currentEmail = (currentUser?.email || '').trim().toLowerCase();
+
+  useEffect(() => {
+    const loadNotifications = async () => {
+      if (!currentUser || !isDashboardUser) {
+        setNotifications([]);
+        return;
+      }
+
+      setNotificationsLoading(true);
+      setNotificationsError('');
+
+      try {
+        const response = await fetchNotifications();
+        const allNotifications = Array.isArray(response?.data) ? response.data : [];
+        const visibleNotifications = allNotifications
+          .filter((item) => item?.status === 'SENT')
+          .filter((item) => doesAudienceMatchRole(item?.audienceType, currentUser?.role))
+          .filter((item) => {
+            const recipientEmail = (item?.recipientEmail || '').trim().toLowerCase();
+            return !recipientEmail || recipientEmail === currentEmail;
+          })
+          .sort((left, right) => new Date(right?.createdAt || 0) - new Date(left?.createdAt || 0));
+
+        setNotifications(visibleNotifications);
+      } catch (loadError) {
+        setNotifications([]);
+        setNotificationsError(loadError.message || 'Failed to load notifications.');
+      } finally {
+        setNotificationsLoading(false);
+      }
+    };
+
+    loadNotifications();
+  }, [currentUser, isDashboardUser, currentEmail]);
+
+  useEffect(() => {
+    if (showNotificationPanel) {
+      setSeenNotificationIds((prev) => {
+        const merged = new Set([...prev, ...notifications.map((item) => item.id)]);
+        return [...merged];
+      });
+    }
+  }, [showNotificationPanel, notifications]);
+
+  const unreadCount = notifications.filter((item) => !seenNotificationIds.includes(item.id)).length;
+  const notificationItems = useMemo(
+    () =>
+      notifications.map((item) => ({
+        id: item.id,
+        subject: item.subject || 'Notification',
+        message: item.message || '',
+        audienceType: item.audienceType || 'ALL',
+        replyMessage: item.replyMessage || '',
+        repliedByName: item.repliedByName || '',
+      })),
+    [notifications]
+  );
 
   const scrollToSection = (sectionId) => {
     if (window.location.pathname !== '/') {
@@ -42,11 +122,41 @@ const Navbar = ({ navigate, currentUser }) => {
   const handleLogout = () => {
     clearStoredUser();
     setIsMenuOpen(false);
+    setShowNotificationPanel(false);
     navigate('/');
   };
 
   const handleEditProfile = () => {
     navigate('/edit-profile');
+  };
+
+  const submitReply = async (notificationId) => {
+    const draft = (replyDrafts[notificationId] || '').trim();
+    if (!draft || !currentUser?.email) return;
+
+    setReplySubmittingId(notificationId);
+    setNotificationsError('');
+
+    try {
+      const response = await replyToNotification(notificationId, {
+        replyMessage: draft,
+        repliedByName:
+          currentUser?.name ||
+          `${currentUser?.firstName || ''} ${currentUser?.lastName || ''}`.trim() ||
+          'Patient',
+        repliedByEmail: currentUser.email,
+      });
+
+      const updated = response?.data;
+      if (updated?.id) {
+        setNotifications((prev) => prev.map((item) => (item.id === updated.id ? updated : item)));
+      }
+      setReplyDrafts((prev) => ({ ...prev, [notificationId]: '' }));
+    } catch (replyError) {
+      setNotificationsError(replyError.message || 'Failed to submit reply.');
+    } finally {
+      setReplySubmittingId(null);
+    }
   };
 
   return (
@@ -129,6 +239,19 @@ const Navbar = ({ navigate, currentUser }) => {
                     </button>
                   </>
                 ) : null}
+                <button
+                  type="button"
+                  onClick={() => setShowNotificationPanel((prev) => !prev)}
+                  className="relative flex h-10 w-10 items-center justify-center rounded-full bg-cyan-100 text-cyan-700 transition hover:bg-cyan-200"
+                  title="Notifications"
+                >
+                  <i className="fas fa-bell text-lg"></i>
+                  {isDashboardUser && unreadCount > 0 ? (
+                    <span className="absolute -right-1 -top-1 min-w-[18px] rounded-full bg-rose-500 px-1 text-center text-[10px] font-bold text-white">
+                      {unreadCount > 9 ? '9+' : unreadCount}
+                    </span>
+                  ) : null}
+                </button>
                 <button
                   type="button"
                   onClick={() => setShowProfileModal(true)}
@@ -258,6 +381,17 @@ const Navbar = ({ navigate, currentUser }) => {
                     <button
                       type="button"
                       onClick={() => {
+                        setShowNotificationPanel((prev) => !prev);
+                        setIsMenuOpen(false);
+                      }}
+                      className="w-full rounded-xl border border-cyan-200 py-3 font-semibold text-cyan-700 flex items-center justify-center gap-2"
+                    >
+                      <i className="fas fa-bell"></i>
+                      Notifications
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
                         setShowProfileModal(true);
                         setIsMenuOpen(false);
                       }}
@@ -303,6 +437,79 @@ const Navbar = ({ navigate, currentUser }) => {
             </div>
           </div>
         )}
+
+        {showNotificationPanel && currentUser ? (
+          <div className="absolute right-4 top-[76px] z-50 w-[320px] rounded-2xl border border-slate-200 bg-white p-4 shadow-xl sm:right-6 lg:right-8">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-black uppercase tracking-[0.16em] text-slate-800">Notifications</h3>
+              <button
+                type="button"
+                onClick={() => setShowNotificationPanel(false)}
+                className="rounded-full p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+                title="Close notifications"
+              >
+                <i className="fas fa-times"></i>
+              </button>
+            </div>
+
+            <div className="mt-3 space-y-2">
+              {notificationsLoading ? (
+                <div className="rounded-xl border border-slate-100 bg-slate-50 px-3 py-2 text-sm text-slate-500">
+                  Loading notifications...
+                </div>
+              ) : null}
+              {notificationsError ? (
+                <div className="rounded-xl border border-rose-100 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+                  {notificationsError}
+                </div>
+              ) : null}
+              {notificationItems.length > 0 ? (
+                notificationItems.map((item) => (
+                  <div key={item.id} className="rounded-xl border border-slate-100 bg-slate-50 px-3 py-2">
+                    <p className="text-sm font-semibold text-slate-800">{item.subject}</p>
+                    <p className="mt-1 text-xs text-slate-600">{item.message}</p>
+                    <p className="mt-2 text-[10px] font-bold uppercase tracking-[0.16em] text-cyan-700">
+                      {item.audienceType}
+                    </p>
+                    {isPatient ? (
+                      <div className="mt-3 space-y-2">
+                        <input
+                          type="text"
+                          value={replyDrafts[item.id] ?? ''}
+                          onChange={(event) =>
+                            setReplyDrafts((prev) => ({ ...prev, [item.id]: event.target.value }))
+                          }
+                          placeholder="Reply to this notification..."
+                          className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800 outline-none transition focus:border-teal-500"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => submitReply(item.id)}
+                          disabled={replySubmittingId === item.id || !(replyDrafts[item.id] || '').trim()}
+                          className="rounded-full bg-teal-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-teal-700 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          {replySubmittingId === item.id ? 'Sending...' : 'Send Reply'}
+                        </button>
+                        {item.replyMessage ? (
+                          <div className="rounded-lg border border-emerald-100 bg-emerald-50 px-3 py-2">
+                            <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-emerald-700">
+                              Your Reply
+                            </p>
+                            <p className="mt-1 text-xs text-emerald-800">{item.replyMessage}</p>
+                          </div>
+                        ) : null}
+                      </div>
+                    ) : null}
+                  </div>
+                ))
+              ) : !notificationsLoading && !notificationsError ? (
+                <div className="rounded-xl border border-slate-100 bg-slate-50 px-3 py-2 text-sm text-slate-500">
+                  No notifications right now.
+                </div>
+              ) : null}
+            </div>
+          </div>
+        ) : null}
 
         {showProfileModal && currentUser && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">

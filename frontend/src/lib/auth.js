@@ -1,5 +1,6 @@
 const AUTH_API_BASE_URL = import.meta.env.VITE_AUTH_API_BASE_URL?.trim() || 'http://localhost:8082';
 const DOCTOR_API_BASE_URL = import.meta.env.VITE_DOCTOR_API_BASE_URL?.trim() || 'http://localhost:8083';
+const NOTIFICATION_API_BASE_URL = import.meta.env.VITE_NOTIFICATION_API_BASE_URL?.trim() || 'http://localhost:8085';
 const PENDING_AUTH_KEY = 'healthcare_pending_auth';
 const AUTH_USER_KEY = 'healthcare_auth_user';
 
@@ -226,6 +227,34 @@ export const updatePatientDetails = (email, payload) =>
 export const deletePatientDetails = (email) =>
   apiRequest(DOCTOR_API_BASE_URL, `/api/patient-details/email/${encodeURIComponent(email)}`, {
     method: 'DELETE',
+  });
+
+export const fetchNotifications = () =>
+  apiRequest(NOTIFICATION_API_BASE_URL, '/api/notifications', {
+    method: 'GET',
+  });
+
+export const createNotification = (payload) =>
+  apiRequest(NOTIFICATION_API_BASE_URL, '/api/notifications', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+
+export const updateNotification = (notificationId, payload) =>
+  apiRequest(NOTIFICATION_API_BASE_URL, `/api/notifications/${notificationId}`, {
+    method: 'PUT',
+    body: JSON.stringify(payload),
+  });
+
+export const deleteNotification = (notificationId) =>
+  apiRequest(NOTIFICATION_API_BASE_URL, `/api/notifications/${notificationId}`, {
+    method: 'DELETE',
+  });
+
+export const replyToNotification = (notificationId, payload) =>
+  apiRequest(NOTIFICATION_API_BASE_URL, `/api/notifications/${notificationId}/reply`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
   });
 
 export const setPendingAuth = (value) => {
