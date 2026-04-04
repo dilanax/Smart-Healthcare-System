@@ -374,9 +374,14 @@ public class AuthServiceImpl implements AuthService, EmailService {
     private Map<String, Object> buildLoginResponse(User user) {
         Map<String, Object> data = new HashMap<>();
         data.put("userId", user.getId());
+        data.put("firstName", user.getFirstName());
+        data.put("lastName", user.getLastName());
         data.put("email", user.getEmail());
+        data.put("phoneNumber", user.getPhoneNumber());
         data.put("role", user.getRole());
         data.put("name", user.getFirstName() + " " + user.getLastName());
+        data.put("otpVerified", user.isOtpVerified());
+        data.put("profilePhoto", user.getProfilePhoto());
         if (user.getRole() == Role.ADMIN) {
             data.put("accessToken", generateAdminToken(user));
             data.put("tokenType", "Bearer");

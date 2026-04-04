@@ -1,17 +1,55 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { updateUserProfile, storeUser } from '../lib/auth';
 
-const EditProfile = ({ navigate, currentUser }) => {
-  const [editFormData, setEditFormData] = useState({
-    firstName: currentUser?.firstName || '',
-    lastName: currentUser?.lastName || '',
-    phoneNumber: currentUser?.phoneNumber || '',
-    profilePhoto: currentUser?.profilePhoto || '',
-  });
+const splitName = (name) => {
+  if (!name || typeof name !== 'string') {
+    return { firstName: '', lastName: '' };
+  }
+
+  const normalized = name.trim().replace(/\s+/g, ' ');
+  if (!normalized) {
+    return { firstName: '', lastName: '' };
+  }
+
+  const parts = normalized.split(' ');
+  if (parts.length === 1) {
+    return { firstName: parts[0], lastName: '' };
+  }
+
+  return {
+    firstName: parts[0],
+    lastName: parts.slice(1).join(' '),
+  };
+};
+
+const buildInitialForm = (user) => {
+  const nameParts = splitName(user?.name);
+
+  return {
+    firstName: user?.firstName || nameParts.firstName,
+    lastName: user?.lastName || nameParts.lastName,
+    phoneNumber: user?.phoneNumber || '',
+    profilePhoto: user?.profilePhoto || '',
+  };
+};
+
+const EditProfile = ({ navigate, currentUser, refreshUser }) => {
+  const [editFormData, setEditFormData] = useState(() => buildInitialForm(currentUser));
   const [photoPreview, setPhotoPreview] = useState(currentUser?.profilePhoto || null);
   const [isSaving, setIsSaving] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
+
+  useEffect(() => {
+    if (!currentUser) {
+      navigate('/login');
+      return;
+    }
+
+    const nextForm = buildInitialForm(currentUser);
+    setEditFormData(nextForm);
+    setPhotoPreview(nextForm.profilePhoto || null);
+  }, [currentUser, navigate]);
 
   const handlePhotoChange = (e) => {
     const file = e.target.files?.[0];
@@ -34,6 +72,11 @@ const EditProfile = ({ navigate, currentUser }) => {
 
   const handleSaveProfile = async (e) => {
     e.preventDefault();
+
+    if (!currentUser?.userId) {
+      setErrorMessage('Unable to update profile. Please login again.');
+      return;
+    }
     
     // Validation
     if (!editFormData.firstName.trim()) {
@@ -50,26 +93,39 @@ const EditProfile = ({ navigate, currentUser }) => {
       setErrorMessage('');
       setSuccessMessage('');
 
+      const firstName = editFormData.firstName.trim();
+      const lastName = editFormData.lastName.trim();
+      const phoneNumber = editFormData.phoneNumber.trim();
+      const profilePhoto = editFormData.profilePhoto || '';
+
       const response = await updateUserProfile(currentUser.userId, {
-        firstName: editFormData.firstName || currentUser.firstName,
-        lastName: editFormData.lastName || currentUser.lastName,
-        phoneNumber: editFormData.phoneNumber || currentUser.phoneNumber,
-        profilePhoto: editFormData.profilePhoto || null,
+        firstName,
+        lastName,
+        phoneNumber,
+        profilePhoto,
       });
 
       if (response && response.data) {
+        const mergedFirstName = response.data.firstName || firstName;
+        const mergedLastName = response.data.lastName || lastName;
+        const mergedPhone = response.data.phoneNumber ?? phoneNumber;
+        const mergedProfilePhoto = response.data.profilePhoto ?? profilePhoto;
+
         const updatedUser = {
           ...currentUser,
-          firstName: editFormData.firstName || currentUser.firstName,
-          lastName: editFormData.lastName || currentUser.lastName,
-          phoneNumber: editFormData.phoneNumber || currentUser.phoneNumber,
-          profilePhoto: editFormData.profilePhoto || currentUser.profilePhoto,
+          ...response.data,
+          firstName: mergedFirstName,
+          lastName: mergedLastName,
+          phoneNumber: mergedPhone,
+          profilePhoto: mergedProfilePhoto,
+          name: `${mergedFirstName} ${mergedLastName}`.trim(),
         };
         storeUser(updatedUser);
+        refreshUser?.();
         setSuccessMessage('Profile updated successfully!');
         
         setTimeout(() => {
-          navigate('/');
+          navigate('/patient-dashboard');
         }, 1500);
       }
     } catch (error) {
@@ -81,7 +137,7 @@ const EditProfile = ({ navigate, currentUser }) => {
   };
 
   const handleCancel = () => {
-    navigate('/');
+    navigate('/patient-dashboard');
   };
 
   const getInitials = () => {
