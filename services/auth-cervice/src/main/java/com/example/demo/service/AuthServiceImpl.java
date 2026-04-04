@@ -233,6 +233,33 @@ public class AuthServiceImpl implements AuthService, EmailService {
     }
 
     @Override
+    public ApiResponseDto updateUserProfile(Long userId, UserProfileUpdateDto requestDto) {
+        Optional<User> optionalUser = userRepository.findById(userId);
+
+        if (optionalUser.isEmpty()) {
+            return new ApiResponseDto("User not found", null);
+        }
+
+        User user = optionalUser.get();
+
+        if (requestDto.getFirstName() != null && !requestDto.getFirstName().isBlank()) {
+            user.setFirstName(requestDto.getFirstName());
+        }
+        if (requestDto.getLastName() != null && !requestDto.getLastName().isBlank()) {
+            user.setLastName(requestDto.getLastName());
+        }
+        if (requestDto.getPhoneNumber() != null && !requestDto.getPhoneNumber().isBlank()) {
+            user.setPhoneNumber(requestDto.getPhoneNumber());
+        }
+        if (requestDto.getProfilePhoto() != null && !requestDto.getProfilePhoto().isBlank()) {
+            user.setProfilePhoto(requestDto.getProfilePhoto());
+        }
+
+        User updatedUser = userRepository.save(user);
+        return new ApiResponseDto("Profile updated successfully", buildUserResponse(updatedUser));
+    }
+
+    @Override
     public ApiResponseDto deleteUser(Long userId) {
         Optional<User> optionalUser = userRepository.findById(userId);
 
@@ -367,6 +394,7 @@ public class AuthServiceImpl implements AuthService, EmailService {
         data.put("role", user.getRole());
         data.put("active", user.isActive());
         data.put("otpVerified", user.isOtpVerified());
+        data.put("profilePhoto", user.getProfilePhoto());
         data.put("createdAt", user.getCreatedAt());
         data.put("updatedAt", user.getUpdatedAt());
         return data;

@@ -111,6 +111,12 @@ export const updateUser = (accessToken, userId, payload) =>
     body: JSON.stringify(payload),
   });
 
+export const updateUserProfile = (userId, payload) =>
+  apiRequest(AUTH_API_BASE_URL, `/api/auth/profile/${userId}`, {
+    method: 'PUT',
+    body: JSON.stringify(payload),
+  });
+
 export const deleteUser = (accessToken, userId) =>
   apiRequest(AUTH_API_BASE_URL, `/api/auth/user/${userId}`, {
     method: 'DELETE',
@@ -155,6 +161,70 @@ export const updateDoctorVerification = (doctorId, verified) =>
 
 export const deleteDoctor = (doctorId) =>
   apiRequest(DOCTOR_API_BASE_URL, `/api/doctors/${doctorId}`, {
+    method: 'DELETE',
+  });
+
+export const fetchVideoConsultationsByPatientEmail = (patientEmail) =>
+  apiRequest(DOCTOR_API_BASE_URL, `/api/video-consultations/patient/${encodeURIComponent(patientEmail)}`, {
+    method: 'GET',
+  });
+
+export const fetchVideoConsultationsByDoctorId = (doctorId) =>
+  apiRequest(DOCTOR_API_BASE_URL, `/api/video-consultations/doctor/${doctorId}`, {
+    method: 'GET',
+  });
+
+export const fetchScheduledVideoConsultationsByDoctorId = (doctorId) =>
+  apiRequest(DOCTOR_API_BASE_URL, `/api/video-consultations/doctor/${doctorId}/scheduled`, {
+    method: 'GET',
+  });
+
+export const fetchVideoConsultationById = (id) =>
+  apiRequest(DOCTOR_API_BASE_URL, `/api/video-consultations/${id}`, {
+    method: 'GET',
+  });
+
+export const createVideoConsultation = (payload) =>
+  apiRequest(DOCTOR_API_BASE_URL, '/api/video-consultations', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+
+export const updateVideoConsultation = (id, payload) =>
+  apiRequest(DOCTOR_API_BASE_URL, `/api/video-consultations/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(payload),
+  });
+
+export const deleteVideoConsultation = (id) =>
+  apiRequest(DOCTOR_API_BASE_URL, `/api/video-consultations/${id}`, {
+    method: 'DELETE',
+  });
+
+export const generateVideoLink = (platform) =>
+  apiRequest(DOCTOR_API_BASE_URL, `/api/video-consultations/generate-link?platform=${encodeURIComponent(platform)}`, {
+    method: 'POST',
+  });
+
+export const getPatientDetails = (email) =>
+  apiRequest(DOCTOR_API_BASE_URL, `/api/patient-details/email/${encodeURIComponent(email)}`, {
+    method: 'GET',
+  });
+
+export const createPatientDetails = (payload) =>
+  apiRequest(DOCTOR_API_BASE_URL, '/api/patient-details', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+
+export const updatePatientDetails = (email, payload) =>
+  apiRequest(DOCTOR_API_BASE_URL, `/api/patient-details/email/${encodeURIComponent(email)}`, {
+    method: 'PUT',
+    body: JSON.stringify(payload),
+  });
+
+export const deletePatientDetails = (email) =>
+  apiRequest(DOCTOR_API_BASE_URL, `/api/patient-details/email/${encodeURIComponent(email)}`, {
     method: 'DELETE',
   });
 

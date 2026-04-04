@@ -32,6 +32,7 @@ const OtpPage = ({ navigate, refreshUser }) => {
   const getDashboardPath = (role) => {
     if (role === 'ADMIN') return '/admin';
     if (role === 'DOCTOR') return '/doctor-dashboard';
+    if (role === 'PATIENT') return '/';
     return '/';
   };
 

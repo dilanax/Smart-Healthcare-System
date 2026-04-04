@@ -9,6 +9,7 @@ public interface AuthService {
     ApiResponseDto getAllUsers();
     ApiResponseDto getUserById(Long userId);
     ApiResponseDto updateUser(Long userId, UpdateUserRequestDto requestDto);
+    ApiResponseDto updateUserProfile(Long userId, UserProfileUpdateDto requestDto);
     ApiResponseDto deleteUser(Long userId);
     boolean isAdminTokenValid(String token);
 }

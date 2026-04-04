@@ -4,6 +4,7 @@ import { clearStoredUser } from '../lib/auth';
 const Navbar = ({ navigate, currentUser }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [activeLink, setActiveLink] = useState('home');
+  const [showProfileModal, setShowProfileModal] = useState(false);
 
   const navLinks = [
     { id: 'home', label: 'Home', icon: 'fas fa-home' },
@@ -15,6 +16,7 @@ const Navbar = ({ navigate, currentUser }) => {
 
   const isAdmin = currentUser?.role === 'ADMIN';
   const isDoctor = currentUser?.role === 'DOCTOR';
+  const isPatient = currentUser?.role === 'PATIENT';
 
   const scrollToSection = (sectionId) => {
     if (window.location.pathname !== '/') {
@@ -41,6 +43,10 @@ const Navbar = ({ navigate, currentUser }) => {
     clearStoredUser();
     setIsMenuOpen(false);
     navigate('/');
+  };
+
+  const handleEditProfile = () => {
+    navigate('/edit-profile');
   };
 
   return (
@@ -105,9 +111,32 @@ const Navbar = ({ navigate, currentUser }) => {
                     Doctor Dashboard
                   </button>
                 ) : null}
-                <div className="rounded-full bg-slate-100 px-4 py-2 text-sm font-medium text-slate-700">
-                  {currentUser.name || currentUser.email}
-                </div>
+                {isPatient ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => navigate('/patient-details')}
+                      className="rounded-full border border-cyan-200 px-4 py-2 text-sm font-semibold text-cyan-700 transition hover:bg-cyan-50"
+                    >
+                      Medical Details
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => navigate('/patient-dashboard')}
+                      className="rounded-full border border-teal-200 px-4 py-2 text-sm font-semibold text-teal-700 transition hover:bg-teal-50"
+                    >
+                      Consultations
+                    </button>
+                  </>
+                ) : null}
+                <button
+                  type="button"
+                  onClick={() => setShowProfileModal(true)}
+                  className="flex h-10 w-10 items-center justify-center rounded-full bg-teal-100 text-teal-700 transition hover:bg-teal-200"
+                  title="View profile"
+                >
+                  <i className="fas fa-user-circle text-lg"></i>
+                </button>
                 <button
                   type="button"
                   onClick={handleLogout}
@@ -202,9 +231,41 @@ const Navbar = ({ navigate, currentUser }) => {
                         Doctor Dashboard
                       </button>
                     ) : null}
-                    <div className="rounded-xl bg-slate-100 px-4 py-3 text-sm font-medium text-slate-700">
-                      Signed in as {currentUser.name || currentUser.email}
-                    </div>
+                    {isPatient ? (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsMenuOpen(false);
+                            navigate('/patient-details');
+                          }}
+                          className="w-full rounded-xl border border-cyan-200 py-3 font-semibold text-cyan-700"
+                        >
+                          Medical Details
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsMenuOpen(false);
+                            navigate('/patient-dashboard');
+                          }}
+                          className="w-full rounded-xl border border-teal-200 py-3 font-semibold text-teal-700"
+                        >
+                          Consultations
+                        </button>
+                      </>
+                    ) : null}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowProfileModal(true);
+                        setIsMenuOpen(false);
+                      }}
+                      className="w-full rounded-xl border border-teal-200 py-3 font-semibold text-teal-700 flex items-center justify-center gap-2"
+                    >
+                      <i className="fas fa-user-circle"></i>
+                      View Profile
+                    </button>
                     <button
                       type="button"
                       onClick={handleLogout}
@@ -238,6 +299,112 @@ const Navbar = ({ navigate, currentUser }) => {
                     </button>
                   </>
                 )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {showProfileModal && currentUser && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
+            <div className="rounded-3xl bg-white p-8 shadow-2xl max-w-md w-full max-h-[90vh] overflow-y-auto">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-2xl font-black text-slate-900">My Profile</h2>
+                <button
+                  type="button"
+                  onClick={() => setShowProfileModal(false)}
+                  className="text-slate-400 hover:text-slate-600"
+                >
+                  <i className="fas fa-times text-2xl"></i>
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                {/* Photo Display */}
+                <div className="flex items-center justify-center mb-6">
+                  {currentUser.profilePhoto ? (
+                    <img
+                      src={currentUser.profilePhoto}
+                      alt="Profile"
+                      className="h-20 w-20 rounded-full object-cover border-4 border-teal-500"
+                    />
+                  ) : (
+                    <div className="h-20 w-20 rounded-full bg-teal-100 flex items-center justify-center border-4 border-teal-200">
+                      <i className="fas fa-user text-3xl text-teal-700"></i>
+                    </div>
+                  )}
+                </div>
+
+                <div className="rounded-2xl bg-slate-50 p-4">
+                  <p className="text-xs font-bold uppercase tracking-widest text-slate-500">Full Name</p>
+                  <p className="mt-2 text-lg font-black text-slate-900">
+                    {currentUser.firstName && currentUser.lastName
+                      ? `${currentUser.firstName} ${currentUser.lastName}`
+                      : currentUser.name || 'Not provided'}
+                  </p>
+                </div>
+
+                <div className="rounded-2xl bg-slate-50 p-4">
+                  <p className="text-xs font-bold uppercase tracking-widest text-slate-500">Email Address</p>
+                  <p className="mt-2 text-lg font-black text-slate-900 break-all">{currentUser.email}</p>
+                </div>
+
+                <div className="rounded-2xl bg-slate-50 p-4">
+                  <p className="text-xs font-bold uppercase tracking-widest text-slate-500">Role</p>
+                  <p className="mt-2 text-lg font-black text-slate-900">{currentUser.role}</p>
+                </div>
+
+                <div className="rounded-2xl bg-slate-50 p-4">
+                  <p className="text-xs font-bold uppercase tracking-widest text-slate-500">Phone Number</p>
+                  <p className="mt-2 text-lg font-black text-slate-900">
+                    {currentUser.phoneNumber || 'Not provided'}
+                  </p>
+                </div>
+
+                <div className="rounded-2xl bg-slate-50 p-4">
+                  <p className="text-xs font-bold uppercase tracking-widest text-slate-500">Account Status</p>
+                  <div className="mt-2 flex items-center gap-2">
+                    <span className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-sm font-semibold ${
+                      currentUser.otpVerified
+                        ? 'bg-emerald-100 text-emerald-700'
+                        : 'bg-amber-100 text-amber-700'
+                    }`}>
+                      <i className={`fas ${currentUser.otpVerified ? 'fa-check-circle' : 'fa-clock'}`}></i>
+                      {currentUser.otpVerified ? 'Verified' : 'Pending Verification'}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="rounded-2xl bg-slate-50 p-4">
+                  <p className="text-xs font-bold uppercase tracking-widest text-slate-500">Account Active</p>
+                  <div className="mt-2 flex items-center gap-2">
+                    <span className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-sm font-semibold ${
+                      currentUser.active
+                        ? 'bg-emerald-100 text-emerald-700'
+                        : 'bg-rose-100 text-rose-700'
+                    }`}>
+                      <i className={`fas ${currentUser.active ? 'fa-toggle-on' : 'fa-toggle-off'}`}></i>
+                      {currentUser.active ? 'Active' : 'Inactive'}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex gap-3 mt-6">
+                  <button
+                    type="button"
+                    onClick={handleEditProfile}
+                    className="flex-1 rounded-full bg-teal-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-teal-700 flex items-center justify-center gap-2"
+                  >
+                    <i className="fas fa-edit"></i>
+                    Edit Profile
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowProfileModal(false)}
+                    className="flex-1 rounded-full bg-slate-300 px-5 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-400"
+                  >
+                    Close
+                  </button>
+                </div>
               </div>
             </div>
           </div>

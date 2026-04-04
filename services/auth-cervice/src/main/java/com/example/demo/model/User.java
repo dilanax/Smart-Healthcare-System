@@ -44,6 +44,9 @@ public class User {
 
     private LocalDateTime updatedAt;
 
+    @Column(columnDefinition = "LONGTEXT")
+    private String profilePhoto;
+
     @PrePersist
     public void prePersist() {
         createdAt = LocalDateTime.now();

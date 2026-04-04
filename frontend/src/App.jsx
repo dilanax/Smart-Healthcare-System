@@ -2,7 +2,10 @@ import { useCallback, useEffect, useState } from 'react';
 import Home from './pages/home';
 import AdminDashboard from './pages/admin-dashboard';
 import DoctorDashboard from './pages/doctor-dashboard';
+import PatientDashboard from './pages/patient-dashboard';
+import PatientDetails from './pages/patient-details';
 import DoctorServicePage from './pages/doctor-service-page';
+import EditProfile from './pages/edit-profile';
 import LoginPage from './pages/login-page';
 import OtpPage from './pages/otp-page';
 import RegisterPage from './pages/register-page';
@@ -16,7 +19,10 @@ const routes = {
   '/otp': OtpPage,
   '/admin': AdminDashboard,
   '/doctor-dashboard': DoctorDashboard,
+  '/patient-dashboard': PatientDashboard,
+  '/patient-details': PatientDetails,
   '/doctor-service': DoctorServicePage,
+  '/edit-profile': EditProfile,
 };
 
 const getCurrentPath = () => {

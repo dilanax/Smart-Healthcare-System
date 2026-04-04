@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Navbar from '../components/navbar';
-import { fetchDoctors } from '../lib/auth';
+import { fetchDoctors, fetchVideoConsultationsByDoctorId, createVideoConsultation as apiCreateConsultation, updateVideoConsultation as apiUpdateConsultation, deleteVideoConsultation as apiDeleteConsultation, generateVideoLink as apiGenerateVideoLink } from '../lib/auth';
 
 const doctorNavItems = [
   { label: 'Dashboard', icon: 'fa-grip' },
@@ -19,7 +19,20 @@ const emptyConsultationForm = {
   duration: '30',
   platform: 'Google Meet',
   meetingLink: '',
+  category: 'General Consultation',
   notes: '',
+};
+
+// Generate a random video consultation link
+const generateVideoLink = (platform) => {
+  const randomCode = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+  const platformUrls = {
+    'Google Meet': `https://meet.google.com/${randomCode}`,
+    'Zoom': `https://zoom.us/j/${Math.floor(Math.random() * 10000000000)}`,
+    'Microsoft Teams': `https://teams.microsoft.com/l/meetup-join/${randomCode}`,
+    'SmartCare Video': `https://smartcare-video.healthcare/room/${randomCode}`,
+  };
+  return platformUrls[platform] || `https://meet.example.com/${randomCode}`;
 };
 
 const inputClassName =
@@ -86,6 +99,8 @@ const DoctorDashboard = ({ navigate, currentUser }) => {
   const [consultationForm, setConsultationForm] = useState(emptyConsultationForm);
   const [consultations, setConsultations] = useState([]);
   const [consultationMessage, setConsultationMessage] = useState('');
+  const [editingId, setEditingId] = useState(null);
+  const [showEditModal, setShowEditModal] = useState(false);
   const consultationSectionRef = useRef(null);
   const patientNameInputRef = useRef(null);
   const contentSectionRef = useRef(null);
@@ -121,13 +136,19 @@ const DoctorDashboard = ({ navigate, currentUser }) => {
   useEffect(() => {
     if (!currentUser?.email) return;
 
-    try {
-      const storedValue = localStorage.getItem(consultationStorageKey(currentUser.email));
-      const parsed = storedValue ? JSON.parse(storedValue) : [];
-      setConsultations(Array.isArray(parsed) ? parsed : []);
-    } catch {
-      setConsultations([]);
-    }
+    const loadConsultations = async () => {
+      try {
+        // First, try to fetch from the backend API using doctor ID
+        // We'll get the doctor ID from the doctors list after it loads
+        const storedValue = localStorage.getItem(consultationStorageKey(currentUser.email));
+        const parsed = storedValue ? JSON.parse(storedValue) : [];
+        setConsultations(Array.isArray(parsed) ? parsed : []);
+      } catch {
+        setConsultations([]);
+      }
+    };
+
+    loadConsultations();
   }, [currentUser?.email]);
 
   const doctorProfile = useMemo(
@@ -138,6 +159,34 @@ const DoctorDashboard = ({ navigate, currentUser }) => {
     [currentUser?.email, doctors]
   );
 
+  // Fetch consultations from backend API when doctor profile is loaded
+  useEffect(() => {
+    if (!doctorProfile?.id) return;
+
+    const loadConsultationsFromBackend = async () => {
+      try {
+        const response = await fetchVideoConsultationsByDoctorId(doctorProfile.id);
+        const consultationsFromApi = Array.isArray(response?.data) ? response.data : [];
+        
+        // Sort by date and time
+        const sortedConsultations = consultationsFromApi.sort((left, right) =>
+          `${left.consultationDate}T${left.consultationTime}`.localeCompare(
+            `${right.consultationDate}T${right.consultationTime}`
+          )
+        );
+        
+        setConsultations(sortedConsultations);
+        // Update localStorage with backend data
+        localStorage.setItem(consultationStorageKey(currentUser.email), JSON.stringify(sortedConsultations));
+      } catch (error) {
+        console.error('Failed to load consultations from backend:', error);
+        // Keep existing consultations from localStorage if API fails
+      }
+    };
+
+    loadConsultationsFromBackend();
+  }, [doctorProfile?.id]);
+
   const displayName = useMemo(() => {
     const rawName =
       doctorProfile?.fullName?.trim() ||
@@ -147,6 +196,18 @@ const DoctorDashboard = ({ navigate, currentUser }) => {
 
     return /^dr\./i.test(rawName) ? rawName : `Dr. ${rawName}`;
   }, [currentUser?.email, currentUser?.name, doctorProfile?.fullName]);
+
+  // Filter consultations to show only those matching the current patient email
+  const filteredConsultations = useMemo(() => {
+    if (!consultationForm.patientEmail) {
+      return consultations; // Show all if no patient email selected
+    }
+
+    const normalizedEmail = consultationForm.patientEmail.trim().toLowerCase();
+    return consultations.filter(
+      (consultation) => consultation.patientEmail?.trim().toLowerCase() === normalizedEmail
+    );
+  }, [consultations, consultationForm.patientEmail]);
 
   const metricCards = buildMetricCards(doctorProfile, consultations);
   const nextConsultation = consultations[0] ?? null;
@@ -173,33 +234,132 @@ const DoctorDashboard = ({ navigate, currentUser }) => {
     }, 120);
   };
 
-  const createVideoConsultation = (event) => {
+  const createVideoConsultation = async (event) => {
     event.preventDefault();
     setConsultationMessage('');
 
-    const newConsultation = {
-      id: crypto.randomUUID(),
-      patientName: consultationForm.patientName.trim(),
-      patientEmail: consultationForm.patientEmail.trim().toLowerCase(),
-      consultationDate: consultationForm.consultationDate,
-      consultationTime: consultationForm.consultationTime,
-      duration: consultationForm.duration,
-      platform: consultationForm.platform,
-      meetingLink: consultationForm.meetingLink.trim(),
-      notes: consultationForm.notes.trim(),
-      status: 'Scheduled',
-    };
+    // Use doctorProfile ID if available, otherwise use a temporary ID or allow backend to handle
+    const doctorId = doctorProfile?.id || currentUser?.id || 1; // Fallback doctor ID
 
-    const nextConsultations = [...consultations, newConsultation].sort((left, right) =>
-      `${left.consultationDate}T${left.consultationTime}`.localeCompare(
-        `${right.consultationDate}T${right.consultationTime}`
-      )
-    );
+    try {
+      const response = await apiCreateConsultation({
+        doctorId: doctorId,
+        patientName: consultationForm.patientName.trim(),
+        patientEmail: consultationForm.patientEmail.trim().toLowerCase(),
+        consultationDate: consultationForm.consultationDate,
+        consultationTime: consultationForm.consultationTime,
+        duration: parseInt(consultationForm.duration),
+        platform: consultationForm.platform,
+        meetingLink: consultationForm.meetingLink.trim(),
+        category: consultationForm.category,
+        notes: consultationForm.notes.trim(),
+        status: 'Scheduled',
+      });
 
-    setConsultations(nextConsultations);
-    localStorage.setItem(consultationStorageKey(currentUser.email), JSON.stringify(nextConsultations));
-    setConsultationForm(emptyConsultationForm);
-    setConsultationMessage('Video consultation created successfully.');
+      const newConsultation = response?.data || {
+        id: crypto.randomUUID(),
+        ...response,
+      };
+
+      const nextConsultations = [...consultations, newConsultation].sort((left, right) =>
+        `${left.consultationDate}T${left.consultationTime}`.localeCompare(
+          `${right.consultationDate}T${right.consultationTime}`
+        )
+      );
+
+      setConsultations(nextConsultations);
+      localStorage.setItem(consultationStorageKey(currentUser.email), JSON.stringify(nextConsultations));
+      setConsultationForm(emptyConsultationForm);
+      setConsultationMessage('Video consultation created successfully.');
+    } catch (error) {
+      setConsultationMessage(`Error: ${error.message}`);
+    }
+  };
+
+  const autoGenerateLink = async () => {
+    try {
+      const response = await apiGenerateVideoLink(consultationForm.platform);
+      const newLink = response?.data || generateVideoLink(consultationForm.platform);
+      setConsultationForm({ ...consultationForm, meetingLink: newLink });
+    } catch {
+      // Fallback to client-side generation if API fails
+      const newLink = generateVideoLink(consultationForm.platform);
+      setConsultationForm({ ...consultationForm, meetingLink: newLink });
+    }
+  };
+
+  const startEditingConsultation = (consultation) => {
+    setEditingId(consultation.id);
+    setConsultationForm({
+      patientName: consultation.patientName,
+      patientEmail: consultation.patientEmail,
+      consultationDate: consultation.consultationDate,
+      consultationTime: consultation.consultationTime,
+      duration: consultation.duration,
+      platform: consultation.platform,
+      meetingLink: consultation.meetingLink,
+      category: consultation.category || 'General Consultation',
+      notes: consultation.notes,
+    });
+    setShowEditModal(true);
+  };
+
+  const updateVideoConsultation = async (event) => {
+    event.preventDefault();
+    setConsultationMessage('');
+
+    try {
+      const consultationToUpdate = consultations.find((c) => c.id === editingId);
+      if (!consultationToUpdate) {
+        setConsultationMessage('Consultation not found.');
+        return;
+      }
+
+      const response = await apiUpdateConsultation(editingId, {
+        doctorId: doctorProfile?.id || consultationToUpdate.doctorId,
+        patientName: consultationForm.patientName.trim(),
+        patientEmail: consultationForm.patientEmail.trim().toLowerCase(),
+        consultationDate: consultationForm.consultationDate,
+        consultationTime: consultationForm.consultationTime,
+        duration: parseInt(consultationForm.duration),
+        platform: consultationForm.platform,
+        meetingLink: consultationForm.meetingLink.trim(),
+        category: consultationForm.category,
+        notes: consultationForm.notes.trim(),
+      });
+
+      const updatedConsultations = consultations.map((item) => {
+        if (item.id === editingId) {
+          return response?.data || item;
+        }
+        return item;
+      }).sort((left, right) =>
+        `${left.consultationDate}T${left.consultationTime}`.localeCompare(
+          `${right.consultationDate}T${right.consultationTime}`
+        )
+      );
+
+      setConsultations(updatedConsultations);
+      localStorage.setItem(consultationStorageKey(currentUser.email), JSON.stringify(updatedConsultations));
+      setConsultationForm(emptyConsultationForm);
+      setEditingId(null);
+      setShowEditModal(false);
+      setConsultationMessage('Video consultation updated successfully.');
+    } catch (error) {
+      setConsultationMessage(`Error: ${error.message}`);
+    }
+  };
+
+  const deleteConsultation = async (id) => {
+    try {
+      await apiDeleteConsultation(id);
+      const nextConsultations = consultations.filter((item) => item.id !== id);
+      setConsultations(nextConsultations);
+      localStorage.setItem(consultationStorageKey(currentUser.email), JSON.stringify(nextConsultations));
+      setConsultationMessage('Video consultation deleted successfully.');
+    } catch (error) {
+      setConsultationMessage(`Error: ${error.message}`);
+    }
   };
 
   if (!currentUser || currentUser.role !== 'DOCTOR') {
@@ -234,12 +394,26 @@ const DoctorDashboard = ({ navigate, currentUser }) => {
               <option value="SmartCare Video">SmartCare Video</option>
             </select>
             <input type="number" min="15" step="15" className={inputClassName} placeholder="Duration in minutes" value={consultationForm.duration} onChange={(event) => setConsultationForm({ ...consultationForm, duration: event.target.value })} required />
+            <select className={inputClassName} value={consultationForm.category} onChange={(event) => setConsultationForm({ ...consultationForm, category: event.target.value })}>
+              <option value="General Consultation">General Consultation</option>
+              <option value="Follow-up">Follow-up</option>
+              <option value="Emergency">Emergency</option>
+              <option value="Urgent Care">Urgent Care</option>
+              <option value="Routine Check-up">Routine Check-up</option>
+              <option value="Post-Surgery">Post-Surgery</option>
+              <option value="Specialist Referral">Specialist Referral</option>
+            </select>
           </div>
 
-          <input className={inputClassName} placeholder="Meeting link" value={consultationForm.meetingLink} onChange={(event) => setConsultationForm({ ...consultationForm, meetingLink: event.target.value })} required />
+          <div className="flex gap-3">
+            <input className={`${inputClassName} flex-1`} placeholder="Meeting link" value={consultationForm.meetingLink} onChange={(event) => setConsultationForm({ ...consultationForm, meetingLink: event.target.value })} required />
+            <button type="button" onClick={autoGenerateLink} className="rounded-full bg-teal-600 px-5 py-3 text-sm font-semibold text-white hover:bg-teal-700 transition">
+              <i className="fas fa-link mr-2"></i>Generate Link
+            </button>
+          </div>
           <textarea className={`${inputClassName} min-h-28`} placeholder="Consultation notes or instructions" value={consultationForm.notes} onChange={(event) => setConsultationForm({ ...consultationForm, notes: event.target.value })} />
 
-          <button type="submit" className="rounded-full bg-slate-900 px-5 py-3 text-sm font-semibold text-white">
+          <button type="submit" className="rounded-full bg-slate-900 px-5 py-3 text-sm font-semibold text-white hover:bg-slate-800 transition">
             Create video consultation
           </button>
         </form>
@@ -249,7 +423,7 @@ const DoctorDashboard = ({ navigate, currentUser }) => {
         <p className="text-xs font-bold uppercase tracking-[0.24em] text-teal-600">Session Queue</p>
         <h2 className="mt-3 text-2xl font-black text-slate-900">Scheduled video consultations</h2>
         <div className="mt-5 space-y-4">
-          {consultations.length > 0 ? consultations.map((item) => (
+          {filteredConsultations.length > 0 ? filteredConsultations.map((item) => (
             <div key={item.id} className="rounded-[1.5rem] border border-stone-200 bg-stone-50 p-4">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div>
@@ -257,17 +431,30 @@ const DoctorDashboard = ({ navigate, currentUser }) => {
                   <p className="mt-1 text-sm text-slate-500">{item.patientEmail}</p>
                   <p className="mt-3 text-sm font-semibold text-teal-700">{formatConsultationDateTime(item.consultationDate, item.consultationTime)}</p>
                 </div>
-                <span className="rounded-full bg-cyan-50 px-3 py-1 text-xs font-bold text-cyan-800">{item.status}</span>
+                <div className="flex flex-col gap-2 items-end">
+                  <span className="rounded-full bg-cyan-50 px-3 py-1 text-xs font-bold text-cyan-800">{item.status}</span>
+                  <p className="text-xs font-semibold text-slate-600 bg-teal-50 px-3 py-1 rounded-full">{item.category}</p>
+                </div>
               </div>
               <div className="mt-4 grid gap-3 text-sm text-slate-600 sm:grid-cols-2">
                 <p>Platform: {item.platform}</p>
                 <p>Duration: {item.duration} minutes</p>
               </div>
-              <p className="mt-3 truncate text-sm text-slate-500">Meeting: {item.meetingLink}</p>
+              <p className="mt-3 truncate text-sm text-slate-500">Meeting: <a href={item.meetingLink} target="_blank" rel="noopener noreferrer" className="text-teal-600 hover:underline">{item.meetingLink}</a></p>
+              <div className="mt-4 flex gap-3">
+                <button type="button" onClick={() => startEditingConsultation(item)} className="flex-1 rounded-lg bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-100 transition">
+                  <i className="fas fa-edit mr-2"></i>Edit
+                </button>
+                <button type="button" onClick={() => deleteConsultation(item.id)} className="flex-1 rounded-lg bg-red-50 px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-100 transition">
+                  <i className="fas fa-trash mr-2"></i>Delete
+                </button>
+              </div>
             </div>
           )) : (
             <div className="rounded-[1.5rem] border border-dashed border-stone-300 p-6 text-sm text-slate-500">
-              No video consultations created yet. Use this window to schedule the first patient session.
+              {consultationForm.patientEmail
+                ? `No consultations scheduled for ${consultationForm.patientEmail}. Create one to get started.`
+                : 'Enter a patient email to view their scheduled consultations.'}
             </div>
           )}
         </div>
@@ -572,6 +759,61 @@ const DoctorDashboard = ({ navigate, currentUser }) => {
                 )
               : null}
           </>
+        ) : null}
+
+        {showEditModal && editingId ? (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
+            <div className="rounded-[2rem] bg-white p-8 shadow-[0_26px_90px_rgba(15,23,42,0.18)] max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-2xl font-black text-slate-900">Edit Video Consultation</h2>
+                <button type="button" onClick={() => { setShowEditModal(false); setEditingId(null); setConsultationForm(emptyConsultationForm); }} className="text-slate-400 hover:text-slate-600">
+                  <i className="fas fa-times text-2xl"></i>
+                </button>
+              </div>
+
+              <form onSubmit={updateVideoConsultation} className="grid gap-4">
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <input className={inputClassName} placeholder="Patient name" value={consultationForm.patientName} onChange={(event) => setConsultationForm({ ...consultationForm, patientName: event.target.value })} required />
+                  <input type="email" className={inputClassName} placeholder="Patient email" value={consultationForm.patientEmail} onChange={(event) => setConsultationForm({ ...consultationForm, patientEmail: event.target.value })} required />
+                  <input type="date" className={inputClassName} value={consultationForm.consultationDate} onChange={(event) => setConsultationForm({ ...consultationForm, consultationDate: event.target.value })} required />
+                  <input type="time" className={inputClassName} value={consultationForm.consultationTime} onChange={(event) => setConsultationForm({ ...consultationForm, consultationTime: event.target.value })} required />
+                  <select className={inputClassName} value={consultationForm.platform} onChange={(event) => setConsultationForm({ ...consultationForm, platform: event.target.value })}>
+                    <option value="Google Meet">Google Meet</option>
+                    <option value="Zoom">Zoom</option>
+                    <option value="Microsoft Teams">Microsoft Teams</option>
+                    <option value="SmartCare Video">SmartCare Video</option>
+                  </select>
+                  <input type="number" min="15" step="15" className={inputClassName} placeholder="Duration in minutes" value={consultationForm.duration} onChange={(event) => setConsultationForm({ ...consultationForm, duration: event.target.value })} required />
+                  <select className={inputClassName} value={consultationForm.category} onChange={(event) => setConsultationForm({ ...consultationForm, category: event.target.value })}>
+                    <option value="General Consultation">General Consultation</option>
+                    <option value="Follow-up">Follow-up</option>
+                    <option value="Emergency">Emergency</option>
+                    <option value="Urgent Care">Urgent Care</option>
+                    <option value="Routine Check-up">Routine Check-up</option>
+                    <option value="Post-Surgery">Post-Surgery</option>
+                    <option value="Specialist Referral">Specialist Referral</option>
+                  </select>
+                </div>
+
+                <div className="flex gap-3">
+                  <input className={`${inputClassName} flex-1`} placeholder="Meeting link" value={consultationForm.meetingLink} onChange={(event) => setConsultationForm({ ...consultationForm, meetingLink: event.target.value })} required />
+                  <button type="button" onClick={autoGenerateLink} className="rounded-full bg-teal-600 px-5 py-3 text-sm font-semibold text-white hover:bg-teal-700 transition">
+                    <i className="fas fa-sync mr-2"></i>Regenerate
+                  </button>
+                </div>
+                <textarea className={`${inputClassName} min-h-24`} placeholder="Consultation notes or instructions" value={consultationForm.notes} onChange={(event) => setConsultationForm({ ...consultationForm, notes: event.target.value })} />
+
+                <div className="flex gap-3 mt-6">
+                  <button type="submit" className="flex-1 rounded-full bg-slate-900 px-5 py-3 text-sm font-semibold text-white hover:bg-slate-800 transition">
+                    Update Consultation
+                  </button>
+                  <button type="button" onClick={() => { setShowEditModal(false); setEditingId(null); setConsultationForm(emptyConsultationForm); }} className="flex-1 rounded-full border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-900 hover:bg-slate-50 transition">
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
         ) : null}
       </main>
     </div>

@@ -56,6 +56,12 @@ public class AuthController {
         return authService.updateUser(userId, requestDto);
     }
 
+    @PutMapping("/profile/{userId}")
+    public ApiResponseDto updateUserProfile(@PathVariable Long userId,
+                                            @RequestBody UserProfileUpdateDto requestDto) {
+        return authService.updateUserProfile(userId, requestDto);
+    }
+
     @DeleteMapping("/user/{userId}")
     public ApiResponseDto deleteUser(@RequestHeader(value = "Authorization", required = false) String authorizationHeader,
                                      @PathVariable Long userId) {

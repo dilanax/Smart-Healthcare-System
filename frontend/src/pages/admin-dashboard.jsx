@@ -119,6 +119,17 @@ const AdminDashboard = ({ navigate, currentUser, refreshUser }) => {
     setSuccess('');
 
     try {
+      // Validate password requirements
+      if (!editingUser && form.password.length < 8) {
+        setError('Password must be at least 8 characters long.');
+        return;
+      }
+
+      if (editingUser && form.password.trim() && form.password.length < 8) {
+        setError('Password must be at least 8 characters long.');
+        return;
+      }
+
       if (editingUser) {
         const payload = {
           firstName: form.firstName.trim(),
@@ -279,7 +290,19 @@ const AdminDashboard = ({ navigate, currentUser, refreshUser }) => {
               <input className={inputClassName} placeholder="First name" value={form.firstName} onChange={(event) => setForm({ ...form, firstName: event.target.value })} required />
               <input className={inputClassName} placeholder="Last name" value={form.lastName} onChange={(event) => setForm({ ...form, lastName: event.target.value })} required />
               <input type="email" className={inputClassName} placeholder="Email" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} required />
-              <input type="password" className={inputClassName} placeholder={editingUser ? 'New password (optional)' : 'Password'} value={form.password} onChange={(event) => setForm({ ...form, password: event.target.value })} required={!editingUser} />
+              <div>
+                <input 
+                  type="password" 
+                  className={inputClassName} 
+                  placeholder={editingUser ? 'New password (optional)' : 'Password'} 
+                  value={form.password} 
+                  onChange={(event) => setForm({ ...form, password: event.target.value })} 
+                  required={!editingUser} 
+                />
+                <p className="mt-2 text-xs text-slate-500">
+                  {editingUser ? 'Password must be at least 8 characters (leave blank to keep current)' : 'Minimum 8 characters required'}
+                </p>
+              </div>
               <input className={inputClassName} placeholder="Phone number" value={form.phoneNumber} onChange={(event) => setForm({ ...form, phoneNumber: event.target.value })} required />
               <select className={inputClassName} value={form.role} onChange={(event) => setForm({ ...form, role: event.target.value })}>
                 <option value="PATIENT">PATIENT</option>
