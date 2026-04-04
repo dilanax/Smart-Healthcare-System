@@ -76,7 +76,7 @@ function useCounter(target, duration, active) {
   return v;
 }
 
-const Hero = () => {
+const Hero = ({ navigate, currentUser }) => {
   const [currentSlide, setCurrentSlide] = useState(0);
   const [statsOn, setStatsOn] = useState(false);
   const [selectedService, setSelectedService] = useState(null);
@@ -263,7 +263,7 @@ const Hero = () => {
               )}
               
               {/* Gradient Overlay */}
-              <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/50 to-transparent z-20"></div>
+              <div className="absolute inset-0 bg-linear-to-r from-black/70 via-black/50 to-transparent z-20"></div>
             </div>
           ))}
         </div>
@@ -325,7 +325,7 @@ const Hero = () => {
                 <h1 className="text-5xl md:text-6xl lg:text-7xl font-bold leading-tight mb-4 animate-slideUp">
                   Your Health,
                   <br />
-                  <span className="text-transparent bg-clip-text bg-gradient-to-r from-teal-400 to-cyan-400">
+                  <span className="text-transparent bg-clip-text bg-linear-to-r from-teal-400 to-cyan-400">
                     Our Priority.
                   </span>
                   <br />
@@ -340,7 +340,16 @@ const Hero = () => {
 
                 {/* Buttons */}
                 <div className="flex flex-col sm:flex-row gap-4 mb-8 animate-slideUp delay-400">
-                  <button className="group bg-gradient-to-r from-teal-500 to-cyan-600 text-white px-8 py-3 rounded-full font-semibold shadow-xl hover:shadow-2xl transition-all hover:scale-105 flex items-center justify-center gap-2">
+                  <button 
+                    onClick={() => {
+                      if (currentUser) {
+                        navigate('/appointment');
+                      } else {
+                        navigate('/login');
+                      }
+                    }}
+                    className="group bg-linear-to-r from-teal-500 to-cyan-600 text-white px-8 py-3 rounded-full font-semibold shadow-xl hover:shadow-2xl transition-all hover:scale-105 flex items-center justify-center gap-2"
+                  >
                     <i className="fas fa-calendar-check"></i> Book Appointment
                     <i className="fas fa-arrow-right group-hover:translate-x-1 transition-transform"></i>
                   </button>
@@ -476,7 +485,16 @@ const Hero = () => {
                       <i key={i} className={`fas fa-star text-xs ${i < doctor.rating ? 'text-yellow-400' : 'text-gray-300'}`}></i>
                     ))}
                   </div>
-                  <button className="mt-3 w-full py-2 bg-teal-600 text-white rounded-lg font-medium hover:bg-teal-700 transition text-sm">
+                  <button 
+                    onClick={() => {
+                      if (currentUser) {
+                        navigate(`/appointment?doctor=${encodeURIComponent(doctor.name)}`);
+                      } else {
+                        navigate('/login');
+                      }
+                    }}
+                    className="mt-3 w-full py-2 bg-teal-600 text-white rounded-lg font-medium hover:bg-teal-700 transition text-sm"
+                  >
                     Book Appointment
                   </button>
                 </div>
@@ -517,7 +535,7 @@ const Hero = () => {
       </section>
 
       {/* CTA Section */}
-      <section className="py-20 bg-gradient-to-r from-teal-600 to-cyan-600">
+      <section className="py-20 bg-linear-to-r from-teal-600 to-cyan-600">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">Ready to Start Your Health Journey?</h2>
           <p className="text-white/90 text-lg mb-6">Book an appointment today and experience the best healthcare services</p>

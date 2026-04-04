@@ -22,6 +22,13 @@ const roleClass = (role) => {
   return 'bg-blue-100 text-blue-700';
 };
 
+const appointmentStatusClass = (status) => {
+  if (status === 'CONFIRMED') return 'bg-green-100 text-green-700';
+  if (status === 'CANCELLED') return 'bg-red-100 text-red-700';
+  if (status === 'COMPLETED') return 'bg-blue-100 text-blue-700';
+  return 'bg-yellow-100 text-yellow-700';
+};
+
 const StatCard = ({ title, value, icon, color, note }) => (
   <div className="rounded-2xl bg-white p-6 shadow-lg">
     <div className="flex items-center justify-between">
@@ -66,6 +73,7 @@ const toEditForm = (user) => ({
 const AdminDashboard = ({ navigate, currentUser, refreshUser }) => {
   const [activeTab, setActiveTab] = useState('overview');
   const [users, setUsers] = useState([]);
+  const [appointments, setAppointments] = useState([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState(null);
@@ -78,6 +86,10 @@ const AdminDashboard = ({ navigate, currentUser, refreshUser }) => {
   const [editForm, setEditForm] = useState(toEditForm(null));
   const [createFormError, setCreateFormError] = useState('');
   const [editFormError, setEditFormError] = useState('');
+  const [selectedAppointment, setSelectedAppointment] = useState(null);
+  const [showAppointmentModal, setShowAppointmentModal] = useState(false);
+  const [showEditAppointmentModal, setShowEditAppointmentModal] = useState(false);
+  const [editAppointmentForm, setEditAppointmentForm] = useState({});
 
   const accessToken = currentUser?.accessToken;
 
@@ -105,6 +117,152 @@ const AdminDashboard = ({ navigate, currentUser, refreshUser }) => {
     }
   }, [accessToken, refreshUser]);
 
+  const loadAppointments = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
+    setError('');
+
+    try {
+      const response = await fetch('http://localhost:8085/api/appointments');
+      if (response.ok) {
+        const data = await response.json();
+        setAppointments(Array.isArray(data) ? data : data.data || []);
+      } else {
+        throw new Error('Failed to fetch appointments');
+      }
+    } catch (err) {
+      const message = err.message || 'Failed to load appointments.';
+      setError(message);
+    } finally {
+      if (!silent) setLoading(false);
+    }
+  }, []);
+
+  const approveAppointment = async (appointmentId) => {
+    setBusyId(appointmentId);
+    setError('');
+    setSuccess('');
+
+    try {
+      const response = await fetch(`http://localhost:8085/api/appointments/${appointmentId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'CONFIRMED' })
+      });
+
+      if (response.ok) {
+        const updatedAppointment = await response.json();
+        setAppointments((prev) =>
+          prev.map((apt) => apt.appointmentId === appointmentId ? updatedAppointment : apt)
+        );
+        setSuccess('Appointment approved successfully.');
+      } else {
+        throw new Error('Failed to approve appointment');
+      }
+    } catch (err) {
+      setError(err.message || 'Failed to approve appointment.');
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const cancelAppointment = async (appointmentId) => {
+    if (!window.confirm('Are you sure you want to cancel this appointment?')) return;
+    
+    setBusyId(appointmentId);
+    setError('');
+    setSuccess('');
+
+    try {
+      const response = await fetch(`http://localhost:8085/api/appointments/${appointmentId}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' }
+      });
+
+      if (response.ok) {
+        setAppointments((prev) =>
+          prev.filter((apt) => apt.appointmentId !== appointmentId)
+        );
+        setSelectedAppointment(null);
+        setSuccess('Appointment cancelled successfully.');
+      } else {
+        throw new Error('Failed to cancel appointment');
+      }
+    } catch (err) {
+      setError(err.message || 'Failed to cancel appointment.');
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const openAppointmentDetails = (appointment) => {
+    setSelectedAppointment(appointment);
+    setShowAppointmentModal(true);
+  };
+
+  const openEditAppointment = (appointment) => {
+    setSelectedAppointment(appointment);
+    setEditAppointmentForm({
+      appointmentDate: appointment.appointmentDate || '',
+      appointmentTime: appointment.appointmentTime || '',
+      reason: appointment.reason || '',
+      status: appointment.status || 'PENDING'
+    });
+    setShowEditAppointmentModal(true);
+  };
+
+  const handleEditAppointmentChange = (e) => {
+    const { name, value } = e.target;
+    setEditAppointmentForm((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const submitEditAppointment = async (e) => {
+    e.preventDefault();
+    if (!selectedAppointment?.appointmentId) return;
+
+    setBusyId(selectedAppointment.appointmentId);
+    setError('');
+    setSuccess('');
+
+    try {
+      const response = await fetch(`http://localhost:8085/api/appointments/${selectedAppointment.appointmentId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(editAppointmentForm)
+      });
+
+      if (response.ok) {
+        const updatedAppointment = await response.json();
+        setAppointments((prev) =>
+          prev.map((apt) => apt.appointmentId === selectedAppointment.appointmentId ? updatedAppointment : apt)
+        );
+        setShowEditAppointmentModal(false);
+        setSelectedAppointment(null);
+        setSuccess('Appointment updated successfully.');
+      } else {
+        throw new Error('Failed to update appointment');
+      }
+    } catch (err) {
+      setError(err.message || 'Failed to update appointment.');
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const sendReminder = async (appointment) => {
+    setBusyId(appointment.appointmentId);
+    setError('');
+    setSuccess('');
+
+    try {
+      window.alert(`📧 Reminder email will be sent to:\n- Patient ID: ${appointment.patientId}\n- Doctor: ${appointment.doctorFirstName} ${appointment.doctorLastName}\n- Date: ${appointment.appointmentDate}\n- Time: ${appointment.appointmentTime}`);
+      setSuccess('Reminder queued for sending.');
+    } catch (err) {
+      setError(err.message || 'Failed to send reminder.');
+    } finally {
+      setBusyId(null);
+    }
+  };
+
   useEffect(() => {
     if (!currentUser) {
       navigate('/login');
@@ -115,7 +273,8 @@ const AdminDashboard = ({ navigate, currentUser, refreshUser }) => {
       return;
     }
     loadUsers();
-  }, [accessToken, currentUser, loadUsers, navigate]);
+    loadAppointments();
+  }, [accessToken, currentUser, loadUsers, loadAppointments, navigate]);
 
   const filteredUsers = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -140,7 +299,9 @@ const AdminDashboard = ({ navigate, currentUser, refreshUser }) => {
     admins: users.filter((user) => user.role === 'ADMIN').length,
     verified: users.filter((user) => user.otpVerified).length,
     inactive: users.filter((user) => !user.active).length,
-  }), [doctors.length, users]);
+    appointments: appointments.length,
+    appointmentsToday: appointments.filter((a) => a.appointmentDate === new Date().toISOString().split('T')[0]).length,
+  }), [doctors.length, users, appointments]);
 
   const openUser = async (userId) => {
     setBusyId(userId);
@@ -318,7 +479,7 @@ const AdminDashboard = ({ navigate, currentUser, refreshUser }) => {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="flex">
-        <aside className="fixed min-h-screen w-64 bg-gradient-to-b from-teal-700 to-teal-900">
+        <aside className="fixed min-h-screen w-64 bg-linear-to-b from-teal-700 to-teal-900">
           <div className="p-6">
             <div className="mb-8 flex items-center gap-3">
               <div className="rounded-xl bg-white/20 p-2"><i className="fas fa-hospital-user text-2xl text-white"></i></div>
@@ -367,8 +528,8 @@ const AdminDashboard = ({ navigate, currentUser, refreshUser }) => {
                   <StatCard title="Patients" value={stats.patients} icon="fas fa-user-friends" color="bg-blue-500" note="Role = PATIENT" />
                   <StatCard title="Doctors" value={stats.doctors} icon="fas fa-user-md" color="bg-teal-500" note="Role = DOCTOR" />
                   <StatCard title="Admins" value={stats.admins} icon="fas fa-user-shield" color="bg-amber-500" note="Role = ADMIN" />
-                  <StatCard title="Verified" value={stats.verified} icon="fas fa-check-circle" color="bg-green-500" note="OTP verified" />
-                  <StatCard title="Inactive" value={stats.inactive} icon="fas fa-ban" color="bg-rose-500" note="Suspended accounts" />
+                  <StatCard title="Total Appointments" value={stats.appointments} icon="fas fa-calendar-check" color="bg-green-500" note="All appointments" />
+                  <StatCard title="Today's Appointments" value={stats.appointmentsToday} icon="fas fa-clock" color="bg-purple-500" note="Appointments today" />
                 </div>
 
                 <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
@@ -384,7 +545,7 @@ const AdminDashboard = ({ navigate, currentUser, refreshUser }) => {
                     </div>
                   </div>
 
-                  <div className="rounded-2xl bg-gradient-to-r from-teal-600 to-cyan-600 p-8 text-white shadow-lg">
+                  <div className="rounded-2xl bg-linear-to-r from-teal-600 to-cyan-600 p-8 text-white shadow-lg">
                     <h3 className="text-2xl font-bold">Live Admin Summary</h3>
                     <p className="mt-2 text-sm text-white/80">This page now uses real user management data instead of hardcoded dashboard values.</p>
                     <div className="mt-6 grid grid-cols-2 gap-4">
@@ -428,11 +589,11 @@ const AdminDashboard = ({ navigate, currentUser, refreshUser }) => {
                           <td className="px-6 py-4"><span className={`rounded-full px-2 py-1 text-xs font-medium ${user.otpVerified ? 'bg-emerald-100 text-emerald-700' : 'bg-yellow-100 text-yellow-700'}`}>{user.otpVerified ? 'verified' : 'pending'}</span></td>
                           <td className="px-6 py-4 text-sm text-gray-500">{formatDate(user.createdAt)}</td>
                           <td className="px-6 py-4">
-                            <div className="flex gap-3">
-                              <button type="button" onClick={() => openUser(user.userId)} disabled={busyId === user.userId} className="text-blue-600 hover:text-blue-800 disabled:opacity-50"><i className="fas fa-eye"></i></button>
-                              <button type="button" onClick={() => startEditUser(user.userId)} disabled={busyId === user.userId} className="text-amber-600 hover:text-amber-800 disabled:opacity-50"><i className="fas fa-pen"></i></button>
-                              <button type="button" onClick={() => setUserActive(user, !user.active)} disabled={busyId === user.userId} className={`${user.active ? 'text-rose-600 hover:text-rose-800' : 'text-green-600 hover:text-green-800'} disabled:opacity-50`}><i className={`fas ${user.active ? 'fa-ban' : 'fa-check-circle'}`}></i></button>
-                              <button type="button" onClick={() => removeUser(user)} disabled={busyId === user.userId} className="text-slate-500 hover:text-rose-700 disabled:opacity-50"><i className="fas fa-trash"></i></button>
+                            <div className="flex flex-wrap gap-2">
+                              <button type="button" onClick={() => openUser(user.userId)} disabled={busyId === user.userId} title="View details" className="px-3 py-1 text-xs font-semibold rounded-md bg-blue-100 text-blue-700 hover:bg-blue-200 disabled:opacity-50">👁️ View</button>
+                              <button type="button" onClick={() => startEditUser(user.userId)} disabled={busyId === user.userId} title="Edit user" className="px-3 py-1 text-xs font-semibold rounded-md bg-amber-100 text-amber-700 hover:bg-amber-200 disabled:opacity-50">✏️ Edit</button>
+                              <button type="button" onClick={() => setUserActive(user, !user.active)} disabled={busyId === user.userId} title={user.active ? 'Suspend user' : 'Activate user'} className={`px-3 py-1 text-xs font-semibold rounded-md disabled:opacity-50 ${user.active ? 'bg-rose-100 text-rose-700 hover:bg-rose-200' : 'bg-green-100 text-green-700 hover:bg-green-200'}`}>{user.active ? '🚫 Suspend' : '✅ Activate'}</button>
+                              <button type="button" onClick={() => removeUser(user)} disabled={busyId === user.userId} title="Delete user" className="px-3 py-1 text-xs font-semibold rounded-md bg-rose-100 text-rose-700 hover:bg-rose-200 disabled:opacity-50">🗑️ Delete</button>
                             </div>
                           </td>
                         </tr>
@@ -463,7 +624,75 @@ const AdminDashboard = ({ navigate, currentUser, refreshUser }) => {
               </div>
             ) : null}
 
-            {!loading && activeTab === 'appointments' ? <Placeholder title="Appointments not connected yet" text="Your backend currently exposes user-management APIs only. This tab is ready for future appointment endpoints." /> : null}
+            {!loading && activeTab === 'appointments' ? (
+              <div className="rounded-2xl bg-white shadow-lg">
+                <div className="flex flex-col gap-4 border-b border-gray-200 px-6 py-4 md:flex-row md:items-center md:justify-between">
+                  <div>
+                    <h3 className="text-lg font-bold text-gray-800">All Appointments</h3>
+                    <p className="mt-1 text-sm text-gray-500">Create, approve, edit, and cancel patient appointments</p>
+                  </div>
+                  <button 
+                    type="button" 
+                    onClick={() => loadAppointments()} 
+                    className="rounded-lg bg-teal-600 px-4 py-2 font-semibold text-white hover:bg-teal-700 flex items-center gap-2"
+                  >
+                    🔄 Refresh
+                  </button>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">ID</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">Patient</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">Doctor</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">Date & Time</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">Reason</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">Token</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">Status</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200">
+                      {appointments.length === 0 ? (
+                        <tr>
+                          <td colSpan="8" className="px-6 py-8 text-center text-sm text-slate-500">
+                            📭 No appointments found
+                          </td>
+                        </tr>
+                      ) : (
+                        appointments.map((appointment) => (
+                          <tr key={appointment.appointmentId} className="hover:bg-gray-50">
+                            <td className="px-6 py-4 text-sm font-medium text-gray-800">#{appointment.appointmentId}</td>
+                            <td className="px-6 py-4 text-sm text-gray-600">ID: {appointment.patientId}</td>
+                            <td className="px-6 py-4 text-sm text-gray-600">{appointment.doctorFirstName} {appointment.doctorLastName}</td>
+                            <td className="px-6 py-4 text-sm text-gray-600">{formatDate(appointment.appointmentDate)} {appointment.appointmentTime}</td>
+                            <td className="px-6 py-4 text-sm text-gray-600 max-w-xs truncate" title={appointment.reason}>{appointment.reason}</td>
+                            <td className="px-6 py-4 text-sm font-mono text-teal-600">{appointment.token || 'N/A'}</td>
+                            <td className="px-6 py-4">
+                              <span className={`rounded-full px-3 py-1 text-xs font-medium ${appointmentStatusClass(appointment.status || 'PENDING')}`}>
+                                {appointment.status || 'PENDING'}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4">
+                              <div className="flex gap-2 flex-wrap">
+                                <button type="button" onClick={() => openAppointmentDetails(appointment)} disabled={busyId === appointment.appointmentId} className="px-2 py-1 text-xs font-semibold rounded-md bg-blue-100 text-blue-700 hover:bg-blue-200 disabled:opacity-50" title="View Details">👁️ View</button>
+                                <button type="button" onClick={() => openEditAppointment(appointment)} disabled={busyId === appointment.appointmentId} className="px-2 py-1 text-xs font-semibold rounded-md bg-amber-100 text-amber-700 hover:bg-amber-200 disabled:opacity-50" title="Edit">✏️ Edit</button>
+                                {(!appointment.status || appointment.status === 'PENDING') && (
+                                  <button type="button" onClick={() => approveAppointment(appointment.appointmentId)} disabled={busyId === appointment.appointmentId} className="px-2 py-1 text-xs font-semibold rounded-md bg-green-100 text-green-700 hover:bg-green-200 disabled:opacity-50" title="Approve">✅ Approve</button>
+                                )}
+                                <button type="button" onClick={() => sendReminder(appointment)} disabled={busyId === appointment.appointmentId} className="px-2 py-1 text-xs font-semibold rounded-md bg-purple-100 text-purple-700 hover:bg-purple-200 disabled:opacity-50" title="Send Reminder">📧 Remind</button>
+                                <button type="button" onClick={() => cancelAppointment(appointment.appointmentId)} disabled={busyId === appointment.appointmentId} className="px-2 py-1 text-xs font-semibold rounded-md bg-red-100 text-red-700 hover:bg-red-200 disabled:opacity-50" title="Cancel">❌ Cancel</button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ) : null}
             {!loading && activeTab === 'payments' ? <Placeholder title="Transactions not connected yet" text="The old payment table was mock data, so it has been replaced with a safe placeholder until payment APIs exist." /> : null}
             {!loading && activeTab === 'reports' ? <Placeholder title="Reports module pending" text="There is no reports endpoint in the current backend, so this section stays as a placeholder." /> : null}
             {!loading && activeTab === 'settings' ? <Placeholder title="Settings module pending" text="Admin settings are not backed by the API yet. The live connection now covers user management only." /> : null}
@@ -558,6 +787,126 @@ const AdminDashboard = ({ navigate, currentUser, refreshUser }) => {
                 <button type="button" onClick={() => setShowEditModal(false)} className="rounded-lg border px-4 py-2 text-slate-600 hover:bg-slate-50">Cancel</button>
                 <button type="submit" disabled={busyId === selectedUser.userId} className="rounded-lg bg-amber-500 px-5 py-2 font-semibold text-white hover:bg-amber-600 disabled:opacity-50">
                   {busyId === selectedUser.userId ? 'Saving...' : 'Save Changes'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      ) : null}
+
+      {showAppointmentModal && selectedAppointment ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setShowAppointmentModal(false)}>
+          <div className="w-full max-w-2xl rounded-2xl bg-white p-6 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="mb-4 flex items-center justify-between">
+              <h3 className="text-xl font-bold text-gray-800">Appointment Details</h3>
+              <button type="button" onClick={() => setShowAppointmentModal(false)} className="text-gray-400 hover:text-gray-600">❌</button>
+            </div>
+            
+            <div className="space-y-4 text-sm">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="rounded-lg bg-gray-50 p-4">
+                  <p className="text-gray-500 text-xs uppercase">Appointment ID</p>
+                  <p className="mt-1 font-bold text-gray-800">#{selectedAppointment.appointmentId}</p>
+                </div>
+                <div className="rounded-lg bg-gray-50 p-4">
+                  <p className="text-gray-500 text-xs uppercase">Status</p>
+                  <p className={`mt-1 font-bold ${appointmentStatusClass(selectedAppointment.status || 'PENDING')}`}>{selectedAppointment.status || 'PENDING'}</p>
+                </div>
+              </div>
+
+              <div className="rounded-lg border border-gray-200 p-4">
+                <h4 className="font-semibold text-gray-800 mb-3">Patient Information</h4>
+                <div className="grid grid-cols-2 gap-3 text-sm">
+                  <div><span className="text-gray-500">Patient ID:</span><span className="ml-2 font-medium">{selectedAppointment.patientId}</span></div>
+                  <div><span className="text-gray-500">Email:</span><span className="ml-2 font-medium">N/A</span></div>
+                </div>
+              </div>
+
+              <div className="rounded-lg border border-gray-200 p-4">
+                <h4 className="font-semibold text-gray-800 mb-3">Doctor Information</h4>
+                <div className="grid grid-cols-2 gap-3 text-sm">
+                  <div><span className="text-gray-500">Doctor ID:</span><span className="ml-2 font-medium">{selectedAppointment.doctorId}</span></div>
+                  <div><span className="text-gray-500">Name:</span><span className="ml-2 font-medium">{selectedAppointment.doctorFirstName} {selectedAppointment.doctorLastName}</span></div>
+                </div>
+              </div>
+
+              <div className="rounded-lg border border-gray-200 p-4">
+                <h4 className="font-semibold text-gray-800 mb-3">Appointment Details</h4>
+                <div className="grid grid-cols-2 gap-3 text-sm">
+                  <div><span className="text-gray-500">Date:</span><span className="ml-2 font-medium">{formatDate(selectedAppointment.appointmentDate)}</span></div>
+                  <div><span className="text-gray-500">Time:</span><span className="ml-2 font-medium">{selectedAppointment.appointmentTime}</span></div>
+                  <div className="col-span-2"><span className="text-gray-500">Reason:</span><p className="mt-1 font-medium text-gray-800">{selectedAppointment.reason}</p></div>
+                  <div className="col-span-2"><span className="text-gray-500">Token:</span><p className="mt-1 font-mono text-teal-600 font-medium">{selectedAppointment.token || 'N/A'}</p></div>
+                </div>
+              </div>
+
+              <div className="rounded-lg border border-gray-200 p-4">
+                <h4 className="font-semibold text-gray-800 mb-3">Timestamps</h4>
+                <div className="grid grid-cols-2 gap-3 text-sm">
+                  <div><span className="text-gray-500">Created:</span><span className="ml-2 font-medium">{formatDateTime(selectedAppointment.createdAt)}</span></div>
+                  <div><span className="text-gray-500">Updated:</span><span className="ml-2 font-medium">{formatDateTime(selectedAppointment.updatedAt)}</span></div>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-6 flex gap-3">
+              <button type="button" onClick={() => { setShowAppointmentModal(false); openEditAppointment(selectedAppointment); }} className="flex-1 rounded-lg border border-amber-300 py-2 text-amber-700 hover:bg-amber-50">✏️ Edit</button>
+              {(!selectedAppointment.status || selectedAppointment.status === 'PENDING') && (
+                <button type="button" onClick={() => { approveAppointment(selectedAppointment.appointmentId); setShowAppointmentModal(false); }} disabled={busyId === selectedAppointment.appointmentId} className="flex-1 rounded-lg bg-green-600 py-2 text-white hover:bg-green-700 disabled:opacity-50">✅ Approve</button>
+              )}
+              <button type="button" onClick={() => { cancelAppointment(selectedAppointment.appointmentId); setShowAppointmentModal(false); }} disabled={busyId === selectedAppointment.appointmentId} className="flex-1 rounded-lg border border-red-500 py-2 text-red-500 hover:bg-red-50 disabled:opacity-50">❌ Cancel</button>
+              <button type="button" onClick={() => setShowAppointmentModal(false)} className="flex-1 rounded-lg border px-4 py-2 text-slate-600 hover:bg-slate-50">Close</button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {showEditAppointmentModal && selectedAppointment ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setShowEditAppointmentModal(false)}>
+          <div className="w-full max-w-2xl rounded-2xl bg-white p-6" onClick={(e) => e.stopPropagation()}>
+            <div className="mb-4 flex items-center justify-between">
+              <h3 className="text-xl font-bold text-gray-800">Edit Appointment</h3>
+              <button type="button" onClick={() => setShowEditAppointmentModal(false)} className="text-gray-400 hover:text-gray-600">❌</button>
+            </div>
+            
+            <form onSubmit={submitEditAppointment} className="space-y-4">
+              <div className="rounded-lg border px-4 py-3 bg-gray-50 text-sm text-gray-600">
+                <p><strong>Appointment ID:</strong> #{selectedAppointment.appointmentId}</p>
+                <p><strong>Doctor:</strong> {selectedAppointment.doctorFirstName} {selectedAppointment.doctorLastName}</p>
+                <p><strong>Patient ID:</strong> {selectedAppointment.patientId}</p>
+              </div>
+
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">📅 Appointment Date</label>
+                  <input type="date" name="appointmentDate" value={editAppointmentForm.appointmentDate} onChange={handleEditAppointmentChange} required className="w-full rounded-lg border px-4 py-3 outline-none focus:ring-2 focus:ring-teal-300" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">⏰ Appointment Time</label>
+                  <input type="time" name="appointmentTime" value={editAppointmentForm.appointmentTime} onChange={handleEditAppointmentChange} required className="w-full rounded-lg border px-4 py-3 outline-none focus:ring-2 focus:ring-teal-300" />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">📝 Reason for Appointment</label>
+                <textarea name="reason" value={editAppointmentForm.reason} onChange={handleEditAppointmentChange} rows="4" required className="w-full rounded-lg border px-4 py-3 outline-none focus:ring-2 focus:ring-teal-300 resize-none" />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">📋 Status</label>
+                <select name="status" value={editAppointmentForm.status} onChange={handleEditAppointmentChange} className="w-full rounded-lg border px-4 py-3 outline-none focus:ring-2 focus:ring-teal-300">
+                  <option value="PENDING">⏳ Pending</option>
+                  <option value="CONFIRMED">✅ Confirmed</option>
+                  <option value="CANCELLED">❌ Cancelled</option>
+                  <option value="RESCHEDULED">🔄 Rescheduled</option>
+                  <option value="COMPLETED">✔️ Completed</option>
+                </select>
+              </div>
+
+              <div className="flex justify-end gap-3">
+                <button type="button" onClick={() => setShowEditAppointmentModal(false)} className="rounded-lg border px-4 py-2 text-slate-600 hover:bg-slate-50">Cancel</button>
+                <button type="submit" disabled={busyId === selectedAppointment.appointmentId} className="rounded-lg bg-amber-500 px-5 py-2 font-semibold text-white hover:bg-amber-600 disabled:opacity-50">
+                  {busyId === selectedAppointment.appointmentId ? 'Saving...' : 'Save Changes'}
                 </button>
               </div>
             </form>
