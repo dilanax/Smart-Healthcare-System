@@ -58,6 +58,25 @@ services:
     networks:
       - healthcare-network
 
+  # Payment Service
+  payment-service:
+    build:
+      context: ./services/payment-service
+      dockerfile: Dockerfile
+    container_name: payment-service
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/healthcare_db?createDatabaseIfNotExist=true
+      SPRING_DATASOURCE_USERNAME: healthcare
+      SPRING_DATASOURCE_PASSWORD: 123456
+      SERVER_PORT: 8083
+    ports:
+      - "8083:8083"
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - healthcare-network
+
   # Appointment Service
   appointment-service:
     build:
@@ -77,7 +96,7 @@ services:
     networks:
       - healthcare-network
 
-  # Frontend
+ # Frontend
   frontend:
     build:
       context: .
@@ -91,6 +110,7 @@ services:
       - auth-service
       - doctor-service
       - appointment-service
+      - payment-service
     networks:
       - healthcare-network
 
