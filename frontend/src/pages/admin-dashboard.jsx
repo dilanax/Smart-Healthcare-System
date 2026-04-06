@@ -90,6 +90,7 @@ const AdminDashboard = ({ navigate, currentUser, refreshUser }) => {
   const [showAppointmentModal, setShowAppointmentModal] = useState(false);
   const [showEditAppointmentModal, setShowEditAppointmentModal] = useState(false);
   const [editAppointmentForm, setEditAppointmentForm] = useState({});
+  const [payments, setPayments] = useState([]);
 
   const accessToken = currentUser?.accessToken;
 
@@ -136,6 +137,74 @@ const AdminDashboard = ({ navigate, currentUser, refreshUser }) => {
       if (!silent) setLoading(false);
     }
   }, []);
+
+  const loadPayments = useCallback(async () => {
+  try {
+    setLoading(true);
+    const response = await fetch("http://localhost:8083/payments/admin/all");
+    if (response.ok) {
+      const data = await response.json();
+      setPayments(Array.isArray(data) ? data : data.data || []);
+    } else {
+      throw new Error("Failed to fetch payments");
+    }
+  } catch (err) {
+    setError(err.message || "Failed to load payments.");
+  } finally {
+    setLoading(false);
+  }
+}, []);
+
+const deletePayment = async (paymentId) => {
+  if (!window.confirm("Are you sure you want to delete this transaction?")) return;
+
+  try {
+    await fetch(
+      `http://localhost:8083/payments/admin/delete/${paymentId}`,
+      { method: "DELETE" }
+    );
+    loadPayments(); // refresh table
+  } catch (err) {
+    alert("Failed to delete payment");
+  }
+};
+
+const updatePayment = async (paymentId) => {
+  const newAmount = prompt("Enter new amount:");
+  if (!newAmount) return;
+
+  try {
+    await fetch(
+      `http://localhost:8083/payments/admin/update/${paymentId}`,
+      {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          amount: Number(newAmount),
+          status: "SUCCESS",
+          method: "ADMIN_UPDATED"
+        }),
+      }
+    );
+    loadPayments(); // refresh table
+  } catch (err) {
+    alert("Failed to update payment");
+  }
+};
+
+const approvePayment = async (paymentId) => {
+  try {
+    await fetch(
+      `http://localhost:8083/payments/confirm/${paymentId}`,
+      { method: "POST" }
+    );
+    loadPayments(); // refresh table
+  } catch (err) {
+    alert("Failed to approve payment");
+  }
+};
+
+
 
   const approveAppointment = async (appointmentId) => {
     setBusyId(appointmentId);
@@ -274,6 +343,7 @@ const AdminDashboard = ({ navigate, currentUser, refreshUser }) => {
     }
     loadUsers();
     loadAppointments();
+    loadPayments();
   }, [accessToken, currentUser, loadUsers, loadAppointments, navigate]);
 
   const filteredUsers = useMemo(() => {
@@ -693,7 +763,103 @@ const AdminDashboard = ({ navigate, currentUser, refreshUser }) => {
                 </div>
               </div>
             ) : null}
-            {!loading && activeTab === 'payments' ? <Placeholder title="Transactions not connected yet" text="The old payment table was mock data, so it has been replaced with a safe placeholder until payment APIs exist." /> : null}
+            
+            {!loading && activeTab === 'payments' ? (
+                  <div className="rounded-2xl bg-white shadow-lg">
+                  <div className="border-b px-6 py-4 flex justify-between items-center">
+                  <h3 className="text-lg font-bold text-gray-800">Payment Transactions</h3>
+                  <button
+                onClick={loadPayments}
+              className="rounded-lg bg-teal-600 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-700"
+              >
+                 🔄 Refresh
+               </button>
+               </div>
+
+            <div className="overflow-x-auto">
+            <table className="w-full">
+            <thead className="bg-gray-50">
+            <tr>
+            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">ID</th>
+            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">Appointment</th>
+            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">Amount</th>
+            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">Method</th>
+            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">Status</th>
+            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">Actions</th>
+          </tr>
+        </thead>
+
+        <tbody className="divide-y divide-gray-200">
+          {payments.length === 0 ? (
+            <tr>
+              <td colSpan="5" className="px-6 py-8 text-center text-sm text-gray-500">
+                No transactions found
+              </td>
+            </tr>
+          ) : (
+            payments.map((p) => (
+              <tr key={p.id || p.paymentId} className="hover:bg-gray-50">
+                <td className="px-6 py-4 text-sm font-medium text-gray-800">
+                  #{p.id || p.paymentId}
+                </td>
+                <td className="px-6 py-4 text-sm text-gray-600">
+                  Appointment #{p.appointmentId}
+                </td>
+                <td className="px-6 py-4 text-sm font-semibold text-teal-700">
+                  LKR {p.amount}
+                </td>
+                <td className="px-6 py-4 text-sm text-gray-600">
+                  {p.method}
+                </td>
+                <td className="px-6 py-4">
+                  <span
+                    className={`rounded-full px-3 py-1 text-xs font-medium ${
+                      p.status === "SUCCESS"
+                        ? "bg-green-100 text-green-700"
+                        : "bg-yellow-100 text-yellow-700"
+                    }`}
+                  >
+                    {p.status}
+                  </span>
+                </td>
+                <td className="px-6 py-4 flex gap-2">
+                  
+                 {/* Approve - ONLY if PENDING */}
+                 {p.status === "PENDING" && (
+                <button
+                onClick={() => approvePayment(p.id)}
+                className="px-3 py-1 text-xs font-semibold rounded-md bg-green-100 text-green-700 hover:bg-green-200"
+                >
+                ✅ Approve
+               </button>
+                )}
+
+                {/* Edit Payment */}
+                <button
+                  onClick={() => updatePayment(p.id)}
+                  className="px-3 py-1 text-xs font-semibold rounded-md bg-amber-100 text-amber-700 hover:bg-amber-200"
+                >
+               ✏️ Edit
+                </button>
+
+                 {/* Delete Payment */}
+                  <button
+                  onClick={() => deletePayment(p.id)}
+                  className="px-3 py-1 text-xs font-semibold rounded-md bg-red-100 text-red-700 hover:bg-red-200"
+                 >
+                🗑️ Delete
+               </button>
+               </td>
+               </tr>
+            ))
+             )}
+               </tbody>
+             </table>
+             </div>
+            </div>
+           ) : null}
+
+
             {!loading && activeTab === 'reports' ? <Placeholder title="Reports module pending" text="There is no reports endpoint in the current backend, so this section stays as a placeholder." /> : null}
             {!loading && activeTab === 'settings' ? <Placeholder title="Settings module pending" text="Admin settings are not backed by the API yet. The live connection now covers user management only." /> : null}
           </main>

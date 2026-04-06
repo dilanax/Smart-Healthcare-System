@@ -5,6 +5,7 @@ import LoginPage from './pages/login-page';
 import OtpPage from './pages/otp-page';
 import RegisterPage from './pages/register-page';
 import AppointmentPage from './pages/appointment-page';
+import PaymentPage from "./pages/payment-page";
 import ProfilePage from './pages/profile-page';
 import { getStoredUser } from './lib/auth';
 import './App.css';
@@ -16,6 +17,7 @@ const routes = {
   '/otp': OtpPage,
   '/admin': AdminDashboard,
   '/appointment': AppointmentPage,
+  '/payment': PaymentPage,
   '/profile': ProfilePage,
 };
 

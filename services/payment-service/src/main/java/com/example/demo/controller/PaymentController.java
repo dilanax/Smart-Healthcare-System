@@ -7,6 +7,12 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
+/**
+ * Payment REST Controller
+ * -----------------------
+ * Handles patient payment initiation and admin payment management.
+ */
+@CrossOrigin(origins = "http://localhost:5173") // ✅ FIXES CORS
 @RestController
 @RequestMapping("/payments")
 @RequiredArgsConstructor
@@ -15,24 +21,23 @@ public class PaymentController {
     private final PaymentService paymentService;
 
     // =========================
-    // CREATE (Patient)
+    // CREATE PAYMENT (Patient)
     // =========================
-    @PostMapping("/initiate")
-    public Payment initiate(@RequestParam Long appointmentId,
-                            @RequestParam Double amount) {
-        return paymentService.initiatePayment(appointmentId, amount);
+    @PostMapping
+    public Payment createPayment(@RequestBody Payment payment) {
+        return paymentService.createPayment(payment);
     }
 
     // =========================
-    // UPDATE (System / Admin)
+    // CONFIRM PAYMENT (Admin / System)
     // =========================
     @PostMapping("/confirm/{id}")
-    public Payment confirm(@PathVariable Long id) {
+    public Payment confirmPayment(@PathVariable Long id) {
         return paymentService.confirmPayment(id);
     }
 
     // =========================
-    // READ (Admin)
+    // READ ALL PAYMENTS (Admin)
     // =========================
     @GetMapping("/admin/all")
     public List<Payment> getAllPayments() {
@@ -40,7 +45,7 @@ public class PaymentController {
     }
 
     // =========================
-    // UPDATE – FULL (Admin)
+    // UPDATE PAYMENT (Admin)
     // =========================
     @PutMapping("/admin/update/{id}")
     public Payment updatePayment(@PathVariable Long id,
@@ -49,7 +54,7 @@ public class PaymentController {
     }
 
     // =========================
-    // DELETE (Admin)
+    // DELETE PAYMENT (Admin)
     // =========================
     @DeleteMapping("/admin/delete/{id}")
     public void deletePayment(@PathVariable Long id) {

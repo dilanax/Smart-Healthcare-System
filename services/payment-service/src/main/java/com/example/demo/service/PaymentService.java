@@ -15,20 +15,33 @@ public class PaymentService {
     private final PaymentRepository repository;
 
     // =========================
-    // CREATE
+    // CREATE PAYMENT (Patient)
     // =========================
-    public Payment initiatePayment(Long appointmentId, Double amount) {
-        Payment payment = new Payment();
-        payment.setAppointmentId(appointmentId);
-        payment.setAmount(amount);
-        payment.setStatus(PaymentStatus.PENDING);
-        payment.setMethod("MOCK");
+   public Payment createPayment(Payment payment) {
 
-        return repository.save(payment);
+    // Example logic: fee based on doctorId (or appointmentId)
+    Double fee = 2500.0; // default
+
+    // TEMP logic (for demo / assignment)
+    if (payment.getAppointmentId() % 3 == 0) {
+        fee = 3000.0;
+    } else if (payment.getAppointmentId() % 2 == 0) {
+        fee = 3500.0;
     }
 
+    payment.setAmount(fee);
+
+    if ("CASH".equalsIgnoreCase(payment.getMethod())) {
+        payment.setStatus(PaymentStatus.PENDING);
+    } else {
+        payment.setStatus(PaymentStatus.SUCCESS);
+    }
+
+    return repository.save(payment);
+}
+
     // =========================
-    // UPDATE (Confirm)
+    // CONFIRM PAYMENT (Admin)
     // =========================
     public Payment confirmPayment(Long paymentId) {
         Payment payment = repository.findById(paymentId)
@@ -39,14 +52,14 @@ public class PaymentService {
     }
 
     // =========================
-    // READ (Admin)
+    // READ ALL PAYMENTS (Admin)
     // =========================
     public List<Payment> getAllPayments() {
         return repository.findAll();
     }
 
     // =========================
-    // UPDATE – FULL (Admin)
+    // UPDATE PAYMENT (Admin)
     // =========================
     public Payment updatePayment(Long id, Payment updatedPayment) {
         Payment payment = repository.findById(id)
@@ -56,19 +69,19 @@ public class PaymentService {
             payment.setAmount(updatedPayment.getAmount());
         }
 
-        if (updatedPayment.getStatus() != null) {
-            payment.setStatus(updatedPayment.getStatus());
-        }
-
         if (updatedPayment.getMethod() != null) {
             payment.setMethod(updatedPayment.getMethod());
+        }
+
+        if (updatedPayment.getStatus() != null) {
+            payment.setStatus(updatedPayment.getStatus());
         }
 
         return repository.save(payment);
     }
 
     // =========================
-    // DELETE (Admin)
+    // DELETE PAYMENT (Admin)
     // =========================
     public void deletePayment(Long id) {
         Payment payment = repository.findById(id)
