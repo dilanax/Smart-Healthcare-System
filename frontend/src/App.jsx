@@ -9,8 +9,6 @@ import EditProfile from './pages/edit-profile';
 import LoginPage from './pages/login-page';
 import OtpPage from './pages/otp-page';
 import RegisterPage from './pages/register-page';
-import AppointmentPage from './pages/appointment-page';
-import ProfilePage from './pages/profile-page';
 import { getStoredUser } from './lib/auth';
 import './App.css';
 
@@ -25,8 +23,6 @@ const routes = {
   '/patient-details': PatientDetails,
   '/doctor-service': DoctorServicePage,
   '/edit-profile': EditProfile,
-  '/appointment': AppointmentPage,
-  '/profile': ProfilePage,
 };
 
 const getCurrentPath = () => {
