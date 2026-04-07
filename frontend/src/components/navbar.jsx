@@ -96,13 +96,6 @@ const Navbar = ({ navigate, currentUser }) => {
                 <div className="rounded-full bg-slate-100 px-4 py-2 text-sm font-medium text-slate-700">
                   {currentUser.name || currentUser.email}
                 </div>
-                <button
-                  type="button"
-                  onClick={handleLogout}
-                  className="rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
-                >
-                  Logout
-                </button>
               </div>
             ) : (
               <div className="ml-4 flex items-center gap-2">

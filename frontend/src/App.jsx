@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import Home from './pages/home';
 import AdminDashboard from './pages/admin-dashboard';
+import DoctorDashboard from './pages/doctor-dashboard';
 import LoginPage from './pages/login-page';
 import OtpPage from './pages/otp-page';
 import RegisterPage from './pages/register-page';
@@ -15,6 +16,7 @@ const routes = {
   '/register': RegisterPage,
   '/otp': OtpPage,
   '/admin': AdminDashboard,
+  '/doctor': DoctorDashboard,
   '/appointment': AppointmentPage,
   '/profile': ProfilePage,
 };

@@ -90,6 +90,7 @@ const AdminDashboard = ({ navigate, currentUser, refreshUser }) => {
   const [showAppointmentModal, setShowAppointmentModal] = useState(false);
   const [showEditAppointmentModal, setShowEditAppointmentModal] = useState(false);
   const [editAppointmentForm, setEditAppointmentForm] = useState({});
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
   const accessToken = currentUser?.accessToken;
 
@@ -474,6 +475,17 @@ const AdminDashboard = ({ navigate, currentUser, refreshUser }) => {
     }
   };
 
+  const handleLogout = () => {
+    localStorage.removeItem('healthcare_auth_user');
+    refreshUser();
+    navigate('/login');
+  };
+
+  const confirmLogout = () => {
+    setShowLogoutConfirm(false);
+    handleLogout();
+  };
+
   if (!currentUser || currentUser.role !== 'ADMIN' || !accessToken) return null;
 
   return (
@@ -492,6 +504,15 @@ const AdminDashboard = ({ navigate, currentUser, refreshUser }) => {
                 </button>
               ))}
             </nav>
+            <div className="mt-8 border-t border-teal-700/50 pt-6">
+              <button
+                type="button"
+                onClick={() => setShowLogoutConfirm(true)}
+                className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-teal-100 hover:bg-red-500/20 hover:text-red-300 transition"
+              >
+                <i className="fas fa-sign-out-alt w-5"></i><span className="text-sm font-medium">Logout</span>
+              </button>
+            </div>
           </div>
         </aside>
 
@@ -913,6 +934,40 @@ const AdminDashboard = ({ navigate, currentUser, refreshUser }) => {
           </div>
         </div>
       ) : null}
+
+      {/* Logout confirmation modal */}
+      {showLogoutConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-sm rounded-2xl bg-white shadow-2xl">
+            <div className="flex items-center justify-center border-b px-6 py-4">
+              <i className="fas fa-exclamation-triangle text-3xl text-amber-500" />
+            </div>
+            <div className="px-6 py-6 text-center">
+              <h3 className="text-lg font-bold text-gray-800">Logout Confirmation</h3>
+              <p className="mt-3 text-sm text-gray-600">
+                Are you sure you want to logout? You will need to log in again to access the admin dashboard.
+              </p>
+            </div>
+            <div className="flex gap-3 border-t px-6 py-4">
+              <button
+                type="button"
+                onClick={() => setShowLogoutConfirm(false)}
+                className="flex-1 rounded-xl border border-gray-300 px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={confirmLogout}
+                className="flex-1 rounded-xl bg-red-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-red-600 transition"
+              >
+                <i className="fas fa-sign-out-alt mr-2" />
+                Logout
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

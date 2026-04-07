@@ -25,9 +25,14 @@ public class AppointmentController {
     }
 
     @GetMapping
-    public List<AppointmentResponseDto> getAllAppointments(@RequestParam(required = false) Long patientId) {
+    public List<AppointmentResponseDto> getAllAppointments(
+            @RequestParam(required = false) Long patientId,
+            @RequestParam(required = false) Long doctorId) {
         if (patientId != null) {
             return appointmentService.getAppointmentsByPatientId(patientId);
+        }
+        if (doctorId != null) {
+            return appointmentService.getAppointmentsByDoctorId(doctorId);
         }
         return appointmentService.getAllAppointments();
     }
