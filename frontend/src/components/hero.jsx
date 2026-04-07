@@ -23,6 +23,16 @@ const Hero = () => {
   const [doctorProfiles, setDoctorProfiles] = useState([]);
   const [doctorLoading, setDoctorLoading] = useState(true);
   const [doctorError, setDoctorError] = useState('');
+const Hero = ({ navigate, currentUser }) => {
+  const [currentSlide, setCurrentSlide] = useState(0);
+  const [statsOn, setStatsOn] = useState(false);
+  const [selectedService, setSelectedService] = useState(null);
+  const [isVideoLoading, setIsVideoLoading] = useState(true);
+  const [videoError, setVideoError] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(true);
+  const statsRef = useRef(null);
+  const videoRef = useRef(null);
+  const slideInterval = useRef(null);
 
   useEffect(() => {
     const loadDoctors = async () => {
@@ -73,6 +83,236 @@ const Hero = () => {
               <div className="rounded-[1.6rem] border border-white/10 bg-white/10 p-4 backdrop-blur">
                 <p className="text-3xl font-black text-cyan-300">50K+</p>
                 <p className="mt-2 text-xs uppercase tracking-[0.2em] text-slate-300">Patients</p>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,500;14..32,600;14..32,700;14..32,800&display=swap');
+        
+        * { font-family: 'Inter', sans-serif; }
+        
+        @keyframes fadeIn {
+          from { opacity: 0; transform: scale(1.02); }
+          to { opacity: 1; transform: scale(1); }
+        }
+        
+        @keyframes fadeOut {
+          from { opacity: 1; transform: scale(1); }
+          to { opacity: 0; transform: scale(1.02); }
+        }
+        
+        @keyframes slideUp {
+          from { opacity: 0; transform: translateY(40px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        
+        @keyframes slideRight {
+          from { opacity: 0; transform: translateX(-40px); }
+          to { opacity: 1; transform: translateX(0); }
+        }
+        
+        @keyframes float {
+          0%, 100% { transform: translateY(0px); }
+          50% { transform: translateY(-10px); }
+        }
+        
+        @keyframes shimmer {
+          0% { background-position: -200%; }
+          100% { background-position: 200%; }
+        }
+        
+        .animate-fadeIn {
+          animation: fadeIn 0.8s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+        }
+        
+        .animate-fadeOut {
+          animation: fadeOut 0.5s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+        }
+        
+        .animate-slideUp {
+          animation: slideUp 0.8s ease-out forwards;
+        }
+        
+        .animate-slideRight {
+          animation: slideRight 0.8s ease-out forwards;
+        }
+        
+        .animate-float {
+          animation: float 3s ease-in-out infinite;
+        }
+        
+        .delay-200 { animation-delay: 0.2s; }
+        .delay-400 { animation-delay: 0.4s; }
+        .delay-600 { animation-delay: 0.6s; }
+        
+        .hover-scale {
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .hover-scale:hover {
+          transform: translateY(-8px) scale(1.02);
+          box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+        }
+        
+        .video-loading {
+          background: linear-gradient(90deg, #1e293b 0%, #334155 50%, #1e293b 100%);
+          background-size: 200% 100%;
+          animation: shimmer 1.5s infinite;
+        }
+      `}</style>
+
+      {/* HERO SECTION - VIDEO BACKGROUND */}
+      <section className="relative min-h-screen overflow-hidden">
+        {/* Video Background */}
+        <div className="absolute inset-0">
+          {heroVideos.map((video, idx) => (
+            <div
+              key={idx}
+              className={`absolute inset-0 transition-all duration-700 ${
+                currentSlide === idx ? 'opacity-100 z-10' : 'opacity-0 z-0'
+              }`}
+            >
+              {/* Dark Overlay */}
+              <div className="absolute inset-0 bg-black/60 z-20"></div>
+              
+              {/* Video or Fallback Image */}
+              {!videoError ? (
+                <video
+                  ref={currentSlide === idx ? videoRef : null}
+                  className="absolute inset-0 w-full h-full object-cover"
+                  autoPlay={currentSlide === idx}
+                  loop
+                  muted
+                  playsInline
+                  onLoadedData={handleVideoLoad}
+                  onError={handleVideoError}
+                >
+                  <source src={video.url} type="video/mp4" />
+                </video>
+              ) : (
+                <img
+                  src={fallbackImages[idx]}
+                  alt={video.title}
+                  className="absolute inset-0 w-full h-full object-cover"
+                />
+              )}
+              
+              {/* Loading Shimmer */}
+              {isVideoLoading && currentSlide === idx && !videoError && (
+                <div className="absolute inset-0 video-loading z-30"></div>
+              )}
+              
+              {/* Gradient Overlay */}
+              <div className="absolute inset-0 bg-linear-to-r from-black/70 via-black/50 to-transparent z-20"></div>
+            </div>
+          ))}
+        </div>
+
+        {/* Video Controls - Mute/Unmute Button */}
+        <button
+          onClick={toggleMute}
+          className="absolute bottom-24 right-6 z-30 bg-black/50 backdrop-blur-sm text-white p-3 rounded-full hover:bg-black/70 transition-all"
+        >
+          <i className="fas fa-volume-up"></i>
+        </button>
+
+        {/* Slide Indicators */}
+        <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 z-30 flex gap-3">
+          {heroVideos.map((_, idx) => (
+            <button
+              key={idx}
+              onClick={() => goToSlide(idx)}
+              className={`transition-all duration-300 rounded-full ${
+                currentSlide === idx 
+                  ? 'w-8 h-2 bg-white' 
+                  : 'w-2 h-2 bg-white/50 hover:bg-white/80'
+              }`}
+            />
+          ))}
+        </div>
+
+        {/* Slide Titles */}
+        <div className="absolute top-1/3 right-8 z-30 text-right hidden lg:block">
+          {heroVideos.map((video, idx) => (
+            <div
+              key={idx}
+              className={`transition-all duration-500 ${
+                currentSlide === idx ? 'opacity-100 transform translate-x-0' : 'opacity-0 transform translate-x-10'
+              }`}
+            >
+              <h3 className="text-white text-2xl font-bold">{video.title}</h3>
+              <p className="text-white/70 text-sm">{video.subtitle}</p>
+            </div>
+          ))}
+        </div>
+
+        {/* Main Content */}
+        <div className="relative z-20 min-h-screen flex items-center">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 w-full">
+            <div className="grid lg:grid-cols-2 gap-12 items-center">
+              {/* Left Content */}
+              <div className="text-white">
+                {/* Emergency Badge */}
+                <div className="inline-flex items-center gap-2 bg-red-500/20 backdrop-blur-sm border border-red-400/30 rounded-full px-5 py-2 mb-6 animate-slideRight">
+                  <span className="relative flex h-3 w-3">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+                  </span>
+                  <span className="text-sm font-semibold tracking-wide">🚨 24/7 Emergency Care Available</span>
+                </div>
+
+                {/* Title */}
+                <h1 className="text-5xl md:text-6xl lg:text-7xl font-bold leading-tight mb-4 animate-slideUp">
+                  Your Health,
+                  <br />
+                  <span className="text-transparent bg-clip-text bg-linear-to-r from-teal-400 to-cyan-400">
+                    Our Priority.
+                  </span>
+                  <br />
+                  <span className="text-white/80">Always.</span>
+                </h1>
+
+                {/* Description */}
+                <p className="text-lg text-white/80 max-w-xl leading-relaxed mb-8 animate-slideUp delay-200">
+                  Experience world-class medical care with cutting-edge technology, compassionate doctors,
+                  and personalised treatment plans designed just for you.
+                </p>
+
+                {/* Buttons */}
+                <div className="flex flex-col sm:flex-row gap-4 mb-8 animate-slideUp delay-400">
+                  <button 
+                    onClick={() => {
+                      if (currentUser) {
+                        navigate('/appointment');
+                      } else {
+                        navigate('/login');
+                      }
+                    }}
+                    className="group bg-linear-to-r from-teal-500 to-cyan-600 text-white px-8 py-3 rounded-full font-semibold shadow-xl hover:shadow-2xl transition-all hover:scale-105 flex items-center justify-center gap-2"
+                  >
+                    <i className="fas fa-calendar-check"></i> Book Appointment
+                    <i className="fas fa-arrow-right group-hover:translate-x-1 transition-transform"></i>
+                  </button>
+                  <button className="border-2 border-white/30 backdrop-blur-sm text-white px-8 py-3 rounded-full font-semibold hover:bg-white/10 transition-all flex items-center justify-center gap-2">
+                    <i className="fas fa-phone-alt"></i> Call Emergency
+                  </button>
+                </div>
+
+                {/* Stats */}
+                <div ref={statsRef} className="grid grid-cols-2 md:grid-cols-4 gap-4 animate-slideUp delay-600">
+                  <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-4 text-center hover:bg-white/20 transition">
+                    <div className="text-2xl md:text-3xl font-bold text-teal-400">{patients.toLocaleString()}+</div>
+                    <div className="text-xs text-white/70">Happy Patients</div>
+                  </div>
+                  <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-4 text-center hover:bg-white/20 transition">
+                    <div className="text-2xl md:text-3xl font-bold text-teal-400">{doctorsCount}+</div>
+                    <div className="text-xs text-white/70">Expert Doctors</div>
+                  </div>
+                  <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-4 text-center hover:bg-white/20 transition">
+                    <div className="text-2xl md:text-3xl font-bold text-teal-400">{success}%</div>
+                    <div className="text-xs text-white/70">Success Rate</div>
+                  </div>
+                  <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-4 text-center hover:bg-white/20 transition">
+                    <div className="text-2xl md:text-3xl font-bold text-teal-400">{clinics}+</div>
+                    <div className="text-xs text-white/70">Clinics Worldwide</div>
+                  </div>
+                </div>
               </div>
               <div className="rounded-[1.6rem] border border-white/10 bg-white/10 p-4 backdrop-blur">
                 <p className="text-3xl font-black text-cyan-300">{activeDoctors.length}</p>
@@ -208,6 +448,34 @@ const Hero = () => {
               No active doctors are available in the database right now.
             </div>
           ) : null}
+                <div className="p-4">
+                  <h3 className="font-bold text-gray-800">{doctor.name}</h3>
+                  <p className="text-teal-600 text-sm font-medium">{doctor.specialty}</p>
+                  <div className="flex justify-between text-xs text-gray-500 mt-2">
+                    <span>💼 {doctor.experience}</span>
+                    <span>👥 {doctor.patients}</span>
+                  </div>
+                  <div className="flex items-center gap-1 mt-2">
+                    {[...Array(5)].map((_, i) => (
+                      <i key={i} className={`fas fa-star text-xs ${i < doctor.rating ? 'text-yellow-400' : 'text-gray-300'}`}></i>
+                    ))}
+                  </div>
+                  <button 
+                    onClick={() => {
+                      if (currentUser) {
+                        navigate(`/appointment?doctor=${encodeURIComponent(doctor.name)}`);
+                      } else {
+                        navigate('/login');
+                      }
+                    }}
+                    className="mt-3 w-full py-2 bg-teal-600 text-white rounded-lg font-medium hover:bg-teal-700 transition text-sm"
+                  >
+                    Book Appointment
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       </section>
 
@@ -231,6 +499,9 @@ const Hero = () => {
 
       <section className="py-20 bg-gradient-to-r from-teal-600 to-cyan-600">
         <div className="mx-auto max-w-7xl px-4 text-center sm:px-6 lg:px-8">
+      {/* CTA Section */}
+      <section className="py-20 bg-linear-to-r from-teal-600 to-cyan-600">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">Ready to Start Your Health Journey?</h2>
           <p className="text-white/90 text-lg mb-6">Book an appointment today and connect with our active specialist doctors.</p>
           <button className="bg-white text-teal-600 px-8 py-3 rounded-full font-semibold hover:shadow-xl transition-all inline-flex items-center gap-2">

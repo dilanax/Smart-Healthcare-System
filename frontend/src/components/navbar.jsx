@@ -167,7 +167,7 @@ const Navbar = ({ navigate, currentUser }) => {
             className="flex cursor-pointer items-center space-x-2 group"
             onClick={() => scrollToSection('home')}
           >
-            <div className="rounded-xl bg-gradient-to-r from-teal-500 to-cyan-600 p-2 shadow-md transition-all group-hover:shadow-lg">
+            <div className="rounded-xl bg-linear-to-r from-teal-500 to-cyan-600 p-2 shadow-md transition-all group-hover:shadow-lg">
               <i className="fas fa-hospital-user text-xl text-white"></i>
             </div>
             <span className="text-2xl font-extrabold tracking-tight">
@@ -262,6 +262,16 @@ const Navbar = ({ navigate, currentUser }) => {
                 </button>
                 <button
                   type="button"
+                  onClick={() => navigate('/profile')}
+                  className="rounded-full bg-teal-100 px-4 py-2 text-sm font-semibold text-teal-700 transition hover:bg-teal-200"
+                >
+                  👤 Profile
+                </button>
+                <div className="rounded-full bg-slate-100 px-4 py-2 text-sm font-medium text-slate-700">
+                  {currentUser.name || currentUser.email}
+                </div>
+                <button
+                  type="button"
                   onClick={handleLogout}
                   className="rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
                 >
@@ -280,7 +290,7 @@ const Navbar = ({ navigate, currentUser }) => {
                 <button
                   type="button"
                   onClick={() => navigate('/register')}
-                  className="flex items-center gap-2 rounded-full bg-gradient-to-r from-teal-600 to-cyan-600 px-5 py-2 text-sm font-semibold text-white shadow-md transition-all hover:scale-105 hover:shadow-xl"
+                  className="flex items-center gap-2 rounded-full bg-linear-to-r from-teal-600 to-cyan-600 px-5 py-2 text-sm font-semibold text-white shadow-md transition-all hover:scale-105 hover:shadow-lg"
                 >
                   <i className="fas fa-user-plus"></i>
                   User Register
@@ -402,6 +412,19 @@ const Navbar = ({ navigate, currentUser }) => {
                     </button>
                     <button
                       type="button"
+                      onClick={() => {
+                        setIsMenuOpen(false);
+                        navigate('/profile');
+                      }}
+                      className="w-full rounded-xl bg-teal-100 py-3 font-semibold text-teal-700"
+                    >
+                      👤 Profile
+                    </button>
+                    <div className="rounded-xl bg-slate-100 px-4 py-3 text-sm font-medium text-slate-700">
+                      Signed in as {currentUser.name || currentUser.email}
+                    </div>
+                    <button
+                      type="button"
                       onClick={handleLogout}
                       className="w-full rounded-xl border border-slate-200 py-3 font-semibold text-slate-700"
                     >
@@ -426,7 +449,7 @@ const Navbar = ({ navigate, currentUser }) => {
                         setIsMenuOpen(false);
                         navigate('/register');
                       }}
-                      className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-teal-600 to-cyan-600 py-3 font-semibold text-white shadow"
+                      className="flex w-full items-center justify-center gap-2 rounded-xl bg-linear-to-r from-teal-600 to-cyan-600 py-3 font-semibold text-white shadow"
                     >
                       <i className="fas fa-user-plus"></i>
                       User Register

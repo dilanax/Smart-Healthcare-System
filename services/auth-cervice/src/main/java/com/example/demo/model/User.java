@@ -29,15 +29,21 @@ public class User {
 
     private String phoneNumber;
 
+    private Integer age;
+
+    private String gender;
+
     @Enumerated(EnumType.STRING)
     private Role role;
 
+    @Builder.Default
     private boolean isActive = true;
 
     private String otp;
 
     private LocalDateTime otpExpiry;
 
+    @Builder.Default
     private boolean otpVerified = false;
 
     private LocalDateTime createdAt;
