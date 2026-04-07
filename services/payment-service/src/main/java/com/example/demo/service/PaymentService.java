@@ -15,33 +15,17 @@ public class PaymentService {
     private final PaymentRepository repository;
 
     // =========================
-    // CREATE PAYMENT (Patient)
+    // CREATE PAYMENT (Gateway / Admin)
     // =========================
-   public Payment createPayment(Payment payment) {
+    public Payment createPayment(Payment payment) {
 
-    // Example logic: fee based on doctorId (or appointmentId)
-    Double fee = 2500.0; // default
-
-    // TEMP logic (for demo / assignment)
-    if (payment.getAppointmentId() % 3 == 0) {
-        fee = 3000.0;
-    } else if (payment.getAppointmentId() % 2 == 0) {
-        fee = 3500.0;
+        // ✅ DO NOT override amount or status
+        // PayHere / controller decides these values
+        return repository.save(payment);
     }
 
-    payment.setAmount(fee);
-
-    if ("CASH".equalsIgnoreCase(payment.getMethod())) {
-        payment.setStatus(PaymentStatus.PENDING);
-    } else {
-        payment.setStatus(PaymentStatus.SUCCESS);
-    }
-
-    return repository.save(payment);
-}
-
     // =========================
-    // CONFIRM PAYMENT (Admin)
+    // CONFIRM PAYMENT (Admin – Cash)
     // =========================
     public Payment confirmPayment(Long paymentId) {
         Payment payment = repository.findById(paymentId)

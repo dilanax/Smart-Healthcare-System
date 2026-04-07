@@ -809,7 +809,11 @@ const approvePayment = async (paymentId) => {
                   LKR {p.amount}
                 </td>
                 <td className="px-6 py-4 text-sm text-gray-600">
-                  {p.method}
+                  
+                     {p.method === "PAYHERE_TEST"
+                       ? "PayHere (Test)"
+                        : p.method}
+
                 </td>
                 <td className="px-6 py-4">
                   <span
@@ -825,7 +829,7 @@ const approvePayment = async (paymentId) => {
                 <td className="px-6 py-4 flex gap-2">
                   
                  {/* Approve - ONLY if PENDING */}
-                 {p.status === "PENDING" && (
+                 {p.status === "PENDING" && p.method === "CASH" &&(
                 <button
                 onClick={() => approvePayment(p.id)}
                 className="px-3 py-1 text-xs font-semibold rounded-md bg-green-100 text-green-700 hover:bg-green-200"
@@ -834,13 +838,15 @@ const approvePayment = async (paymentId) => {
                </button>
                 )}
 
-                {/* Edit Payment */}
-                <button
-                  onClick={() => updatePayment(p.id)}
-                  className="px-3 py-1 text-xs font-semibold rounded-md bg-amber-100 text-amber-700 hover:bg-amber-200"
-                >
-               ✏️ Edit
-                </button>
+                {/* Edit Payment – NOT allowed for PayHere */}
+                 {p.method !== "PAYHERE_TEST" && (
+                      <button
+                      onClick={() => updatePayment(p.id)}
+                      className="px-3 py-1 text-xs font-semibold rounded-md bg-amber-100 text-amber-700 hover:bg-amber-200"
+                    >
+                     ✏️ Edit
+                  </button>
+                )}          
 
                  {/* Delete Payment */}
                   <button

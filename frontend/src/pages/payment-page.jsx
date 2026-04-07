@@ -3,17 +3,9 @@ import Navbar from "../components/navbar";
 
 const PaymentPage = ({ navigate }) => {
   const [payment, setPayment] = useState(null);
+  const [loading, setLoading] = useState(false);
 
-  // Payment method
-  const [method, setMethod] = useState("CARD");
-
-  // Card details (only used if CARD)
-  const [cardType, setCardType] = useState("VISA");
-  const [cardNumber, setCardNumber] = useState("");
-  const [expiry, setExpiry] = useState("");
-  const [cvv, setCvv] = useState("");
-
-  // Load payment info from localStorage
+  // Load payment info saved after appointment booking
   useEffect(() => {
     const stored = localStorage.getItem("paymentInfo");
 
@@ -27,113 +19,138 @@ const PaymentPage = ({ navigate }) => {
 
   if (!payment) return null;
 
- const handlePayment = async () => {
-  try {
-    await fetch("http://localhost:8083/payments", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        appointmentId: payment.appointmentId,
-        amount: payment.amount,
-        method: method,
-        status: method === "CASH" ? "PENDING" : "SUCCESS"
-      }),
-    });
+  // ================================
+  // PAYHERE PAYMENT (ONLINE / CARD)
+  // ================================
+  const handlePayHerePayment = async () => {
+    try {
+      setLoading(true);
 
-    localStorage.removeItem("paymentInfo");
-    alert("✅ Payment recorded successfully");
-    navigate("/");
-  } catch (err) {
-    console.error(err);
-    alert("❌ Payment failed, please try again");
-  }
-};
+      const orderId = `APT_${payment.appointmentId}`;
+
+      // 1️⃣ Fetch hash from backend
+      const response = await fetch(
+        "http://localhost:8083/payments/payhere-hash",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            order_id: orderId,
+            amount: payment.amount,
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to generate PayHere hash");
+      }
+
+      const hash = await response.text();
+
+      // 2️⃣ Start PayHere checkout
+      window.payhere.startPayment({
+        sandbox: true,
+        merchant_id: "1235016",
+
+        return_url: "http://localhost:5173/",
+        cancel_url: "http://localhost:5173/",
+        notify_url: "http://localhost:8083/payments/payhere-notify",
+
+        order_id: orderId,
+        items: "Doctor Appointment",
+        amount: payment.amount,
+        currency: "LKR",
+
+        first_name: "Test",
+        last_name: "User",
+        email: "test@payhere.com",
+        phone: "0771234567",
+        address: "Colombo",
+        city: "Colombo",
+        country: "Sri Lanka",
+
+        hash: hash,
+      });
+    } catch (err) {
+      console.error(err);
+      alert("❌ Unable to start PayHere payment");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ================================
+  // CASH PAYMENT (OFFLINE)
+  // ================================
+  const handleCashPayment = async () => {
+    try {
+      await fetch("http://localhost:8083/payments", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          appointmentId: payment.appointmentId,
+          amount: payment.amount,
+          method: "CASH",
+          status: "PENDING",
+        }),
+      });
+
+      localStorage.removeItem("paymentInfo");
+      alert("✅ Appointment booked. Please pay cash at the hospital.");
+      navigate("/");
+    } catch (err) {
+      console.error(err);
+      alert("❌ Failed to register cash payment");
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
       <Navbar navigate={navigate} />
 
       <div className="max-w-4xl mx-auto mt-10 grid grid-cols-1 md:grid-cols-2 gap-8">
-
         {/* LEFT: Appointment Summary */}
         <div className="bg-white shadow-lg rounded-xl p-6">
           <h2 className="text-xl font-bold mb-4">Appointment Summary</h2>
 
-          <p><b>Doctor:</b> {payment.doctor}</p>
-          <p><b>Date:</b> {payment.date}</p>
-          <p><b>Time:</b> {payment.time}</p>
+          <p>
+            <b>Doctor:</b> {payment.doctor}
+          </p>
+          <p>
+            <b>Date:</b> {payment.date}
+          </p>
+          <p>
+            <b>Time:</b> {payment.time}
+          </p>
 
           <p className="mt-4 text-lg font-semibold text-teal-700">
             Amount: LKR {payment.amount}
           </p>
         </div>
 
-        {/* RIGHT: Payment */}
+        {/* RIGHT: Payment Options */}
         <div className="bg-white shadow-lg rounded-xl p-6">
           <h2 className="text-xl font-bold mb-4">Payment</h2>
 
-          {/* Payment Method */}
-          <label className="block mb-2 font-semibold">
-            Payment Method
-          </label>
+          <p className="mb-4 text-sm text-gray-600">
+            Choose how you want to pay for your appointment.
+          </p>
 
-          <select
-            value={method}
-            onChange={(e) => setMethod(e.target.value)}
-            className="w-full border rounded-lg p-2 mb-4"
-          >
-            <option value="CARD">Card</option>
-            <option value="CASH">Cash (Pay at Hospital)</option>
-          </select>
-
-          {/* Card Details – ONLY IF CARD */}
-          {method === "CARD" && (
-            <>
-              <label className="block mb-1 font-semibold">
-                Card Type
-              </label>
-              <select
-                value={cardType}
-                onChange={(e) => setCardType(e.target.value)}
-                className="w-full border rounded-lg p-2 mb-3"
-              >
-                <option value="VISA">VISA</option>
-                <option value="MASTERCARD">MasterCard</option>
-              </select>
-
-              <input
-                type="text"
-                placeholder="Card Number"
-                value={cardNumber}
-                onChange={(e) => setCardNumber(e.target.value)}
-                className="w-full border rounded-lg p-2 mb-3"
-              />
-
-              <div className="grid grid-cols-2 gap-3 mb-4">
-                <input
-                  type="text"
-                  placeholder="MM/YY"
-                  value={expiry}
-                  onChange={(e) => setExpiry(e.target.value)}
-                  className="border rounded-lg p-2"
-                />
-                <input
-                  type="password"
-                  placeholder="CVV"
-                  value={cvv}
-                  onChange={(e) => setCvv(e.target.value)}
-                  className="border rounded-lg p-2"
-                />
-              </div>
-            </>
-          )}
-
-          {/* Confirm Button */}
+          {/* PayHere */}
           <button
-            onClick={handlePayment}
-            className="w-full bg-teal-600 text-white py-3 rounded-lg font-bold hover:bg-teal-700"
+            onClick={handlePayHerePayment}
+            disabled={loading}
+            className="w-full bg-teal-600 text-white py-3 rounded-lg font-bold hover:bg-teal-700 disabled:opacity-50"
           >
-            Confirm Payment
+            {loading ? "Redirecting..." : "💳 Pay with PayHere (Test)"}
+          </button>
+
+          {/* Cash */}
+          <button
+            onClick={handleCashPayment}
+            className="w-full mt-3 bg-gray-200 text-gray-800 py-3 rounded-lg font-bold hover:bg-gray-300"
+          >
+            💵 Pay Cash at Hospital
           </button>
         </div>
       </div>
