@@ -1,7 +1,6 @@
 package com.example.demo.controller;
 
 <<<<<<< HEAD
-<<<<<<< HEAD
 import com.example.demo.dto.ApiResponse;
 import com.example.demo.dto.DoctorRequest;
 import com.example.demo.dto.DoctorStatusUpdateRequest;
@@ -22,17 +21,12 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 =======
-=======
->>>>>>> parent of 8b6b691 (Merge branch 'dev' into feature_doctor)
 import com.example.demo.model.Doctor;
 import com.example.demo.repo.DoctorRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-<<<<<<< HEAD
 >>>>>>> parent of d8dadb9 (Reapply "Merge branch 'dev' into feature_doctor")
-=======
->>>>>>> parent of 8b6b691 (Merge branch 'dev' into feature_doctor)
 
 import java.util.List;
 
@@ -86,10 +80,7 @@ public class DoctorController {
         doctorService.deleteDoctor(doctorId);
         return ApiResponse.success("Doctor profile removed successfully.", null);
 <<<<<<< HEAD
-<<<<<<< HEAD
 =======
-=======
->>>>>>> parent of 8b6b691 (Merge branch 'dev' into feature_doctor)
 public class DoctorController {
 
     @Autowired
@@ -148,9 +139,6 @@ public class DoctorController {
     public ResponseEntity<Void> deleteDoctor(@PathVariable int id) {
         doctorRepository.deleteById(id);
         return ResponseEntity.noContent().build();
-<<<<<<< HEAD
 >>>>>>> parent of d8dadb9 (Reapply "Merge branch 'dev' into feature_doctor")
-=======
->>>>>>> parent of 8b6b691 (Merge branch 'dev' into feature_doctor)
     }
 }
