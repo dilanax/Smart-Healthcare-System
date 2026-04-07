@@ -31,6 +31,14 @@ services:
       SPRING_DATASOURCE_USERNAME: healthcare
       SPRING_DATASOURCE_PASSWORD: 123456
       SERVER_PORT: 8081
+      SPRING_MAIL_HOST: smtp.gmail.com
+      SPRING_MAIL_PORT: 587
+      SPRING_MAIL_USERNAME: dilanavishka183@gmail.com
+      SPRING_MAIL_PASSWORD: pllb iekj knmu scuc
+      SPRING_MAIL_PROPERTIES_MAIL_SMTP_AUTH: "true"
+      SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE: "true"
+      APP_JWT_SECRET: my-super-secret-key-change-this-in-production
+      APP_JWT_EXPIRATION_HOURS: 8
     ports:
       - "8081:8081"
     depends_on:
@@ -58,6 +66,50 @@ services:
     networks:
       - healthcare-network
 
+  # Patient Service
+  patient-service:
+    build:
+      context: ./services/patient-service
+      dockerfile: Dockerfile
+    container_name: patient-service
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/healthcare_db?createDatabaseIfNotExist=true
+      SPRING_DATASOURCE_USERNAME: healthcare
+      SPRING_DATASOURCE_PASSWORD: 123456
+      SERVER_PORT: 8083
+    ports:
+      - "8083:8083"
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - healthcare-network
+
+  # Notification Service
+  notification-service:
+    build:
+      context: ./services/notification-service
+      dockerfile: Dockerfile
+    container_name: notification-service
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/healthcare_db?createDatabaseIfNotExist=true
+      SPRING_DATASOURCE_USERNAME: healthcare
+      SPRING_DATASOURCE_PASSWORD: 123456
+      SERVER_PORT: 8084
+      SPRING_MAIL_HOST: smtp.gmail.com
+      SPRING_MAIL_PORT: 587
+      SPRING_MAIL_USERNAME: dilanavishka183@gmail.com
+      SPRING_MAIL_PASSWORD: pllb iekj knmu scuc
+      SPRING_MAIL_PROPERTIES_MAIL_SMTP_AUTH: "true"
+      SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE: "true"
+    ports:
+      - "8084:8084"
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - healthcare-network
+
   # Appointment Service
   appointment-service:
     build:
@@ -77,6 +129,25 @@ services:
     networks:
       - healthcare-network
 
+  # Payment Service
+  payment-service:
+    build:
+      context: ./services/payment-service
+      dockerfile: Dockerfile
+    container_name: payment-service
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/healthcare_db?createDatabaseIfNotExist=true
+      SPRING_DATASOURCE_USERNAME: healthcare
+      SPRING_DATASOURCE_PASSWORD: 123456
+      SERVER_PORT: 8086
+    ports:
+      - "8086:8086"
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - healthcare-network
+
   # Frontend
   frontend:
     build:
@@ -86,11 +157,14 @@ services:
     ports:
       - "5173:5173"
     environment:
-      VITE_API_URL: http://localhost:8081
+      VITE_API_BASE_URL: http://localhost:8081
     depends_on:
       - auth-service
       - doctor-service
+      - patient-service
+      - notification-service
       - appointment-service
+      - payment-service
     networks:
       - healthcare-network
 
