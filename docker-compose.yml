@@ -1,0 +1,145 @@
+services:
+
+  # ── Auth Service ─────────────────────────────────────────────
+  auth-service:
+    build:
+      context: ./services/auth-cervice
+      dockerfile: Dockerfile
+    container_name: auth-service
+    ports:
+      - "8082:8082"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:h2:file:/data/auth-service-db
+      SPRING_DATASOURCE_DRIVER_CLASS_NAME: org.h2.Driver
+      SPRING_DATASOURCE_USERNAME: sa
+      SPRING_DATASOURCE_PASSWORD: ""
+      APP_JWT_SECRET: smart-healthcare-dev-secret
+      APP_JWT_EXPIRATION_HOURS: "8"
+    volumes:
+      - auth-data:/data
+    restart: unless-stopped
+
+  # ── Doctor Service ────────────────────────────────────────────
+  doctor-service:
+    build:
+      context: ./services/doctor-service
+      dockerfile: Dockerfile
+    container_name: doctor-service
+    ports:
+      - "8083:8083"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:h2:file:/data/doctor-service-db
+      SPRING_DATASOURCE_DRIVER_CLASS_NAME: org.h2.Driver
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: root123
+    volumes:
+      - doctor-data:/data
+    restart: unless-stopped
+
+  # ── Patient Service ───────────────────────────────────────────
+  patient-service:
+    build:
+      context: ./services/patient-service
+      dockerfile: Dockerfile
+    container_name: patient-service
+    ports:
+      - "8084:8084"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:h2:file:/data/patient-service-db
+      SPRING_DATASOURCE_DRIVER_CLASS_NAME: org.h2.Driver
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: root123
+    volumes:
+      - patient-data:/data
+    restart: unless-stopped
+
+  # ── Appointment Service ───────────────────────────────────────
+  appointment-service:
+    build:
+      context: ./services/appointment-service
+      dockerfile: Dockerfile
+    container_name: appointment-service
+    ports:
+      - "8081:8082"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:h2:file:/data/appointment-service-db
+      SPRING_DATASOURCE_DRIVER_CLASS_NAME: org.h2.Driver
+      SPRING_DATASOURCE_USERNAME: sa
+      SPRING_DATASOURCE_PASSWORD: ""
+      APP_JWT_SECRET: my-super-secret-key-change-this-in-production
+      APP_JWT_EXPIRATION_HOURS: "8"
+      SPRING_MAIL_HOST: smtp.gmail.com
+      SPRING_MAIL_PORT: "587"
+      SPRING_MAIL_USERNAME: dilanavishka183@gmail.com
+      SPRING_MAIL_PASSWORD: "pllb iekj knmu scuc"
+      SPRING_MAIL_PROPERTIES_MAIL_SMTP_AUTH: "true"
+      SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE: "true"
+    volumes:
+      - appointment-data:/data
+    restart: unless-stopped
+
+  # ── Notification Service ──────────────────────────────────────
+  notification-service:
+    build:
+      context: ./services/notification-service
+      dockerfile: Dockerfile
+    container_name: notification-service
+    ports:
+      - "8085:8085"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:h2:file:/data/notification-service-db
+      SPRING_DATASOURCE_DRIVER_CLASS_NAME: org.h2.Driver
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: root123
+    volumes:
+      - notification-data:/data
+    restart: unless-stopped
+
+  # ── Payment Service ───────────────────────────────────────────
+  payment-service:
+    build:
+      context: ./services/payment-service
+      dockerfile: Dockerfile
+    container_name: payment-service
+    ports:
+      - "8086:8082"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:h2:file:/data/payment-service-db
+      SPRING_DATASOURCE_DRIVER_CLASS_NAME: org.h2.Driver
+      SPRING_DATASOURCE_USERNAME: sa
+      SPRING_DATASOURCE_PASSWORD: ""
+      APP_JWT_SECRET: my-super-secret-key-change-this-in-production
+      APP_JWT_EXPIRATION_HOURS: "8"
+      SPRING_MAIL_HOST: smtp.gmail.com
+      SPRING_MAIL_PORT: "587"
+      SPRING_MAIL_USERNAME: dilanavishka183@gmail.com
+      SPRING_MAIL_PASSWORD: "pllb iekj knmu scuc"
+      SPRING_MAIL_PROPERTIES_MAIL_SMTP_AUTH: "true"
+      SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE: "true"
+    volumes:
+      - payment-data:/data
+    restart: unless-stopped
+
+  # ── Frontend ──────────────────────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: frontend
+    ports:
+      - "5175:80"
+    depends_on:
+      - auth-service
+      - doctor-service
+      - patient-service
+      - appointment-service
+      - notification-service
+    restart: unless-stopped
+
+volumes:
+  auth-data:
+  doctor-data:
+  patient-data:
+  appointment-data:
+  notification-data:
+  payment-data:
