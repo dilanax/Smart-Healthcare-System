@@ -90,6 +90,7 @@ const AdminDashboard = ({ navigate, currentUser, refreshUser }) => {
   const [showAppointmentModal, setShowAppointmentModal] = useState(false);
   const [showEditAppointmentModal, setShowEditAppointmentModal] = useState(false);
   const [editAppointmentForm, setEditAppointmentForm] = useState({});
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
   const accessToken = currentUser?.accessToken;
 
@@ -261,6 +262,13 @@ const AdminDashboard = ({ navigate, currentUser, refreshUser }) => {
     } finally {
       setBusyId(null);
     }
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('healthcare_auth_user');
+    localStorage.removeItem('healthcare_pending_auth');
+    setShowLogoutConfirm(false);
+    navigate('/login');
   };
 
   useEffect(() => {
@@ -507,6 +515,9 @@ const AdminDashboard = ({ navigate, currentUser, refreshUser }) => {
                 <p className="text-sm font-semibold text-gray-800">{currentUser.name || currentUser.email}</p>
                 <p className="text-xs text-gray-500">Administrator</p>
               </div>
+              <button type="button" onClick={() => setShowLogoutConfirm(true)} className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-2 text-sm font-semibold text-rose-700 hover:bg-rose-100">
+                <i className="fas fa-sign-out-alt mr-2"></i>Logout
+              </button>
             </div>
           </header>
 
@@ -910,6 +921,31 @@ const AdminDashboard = ({ navigate, currentUser, refreshUser }) => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      ) : null}
+
+      {showLogoutConfirm ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setShowLogoutConfirm(false)}>
+          <div className="w-full max-w-md rounded-2xl bg-white p-6" onClick={(e) => e.stopPropagation()}>
+            <div className="mb-4 flex items-center justify-between">
+              <h3 className="text-xl font-bold text-gray-800">Confirm Logout</h3>
+              <button type="button" onClick={() => setShowLogoutConfirm(false)} className="text-gray-400 hover:text-gray-600"><i className="fas fa-times"></i></button>
+            </div>
+            <div className="mb-6 rounded-lg bg-amber-50 p-4">
+              <p className="text-sm text-gray-700">
+                <i className="fas fa-exclamation-circle mr-2 text-amber-600"></i>
+                Are you sure you want to logout? You will be redirected to the login page.
+              </p>
+            </div>
+            <div className="flex justify-end gap-3">
+              <button type="button" onClick={() => setShowLogoutConfirm(false)} className="rounded-lg border px-4 py-2 text-slate-600 hover:bg-slate-50 font-semibold">
+                Cancel
+              </button>
+              <button type="button" onClick={handleLogout} className="rounded-lg bg-rose-600 px-5 py-2 font-semibold text-white hover:bg-rose-700">
+                <i className="fas fa-sign-out-alt mr-2"></i>Logout
+              </button>
+            </div>
           </div>
         </div>
       ) : null}
