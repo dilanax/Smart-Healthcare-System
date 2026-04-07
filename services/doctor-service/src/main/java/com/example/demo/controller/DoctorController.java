@@ -1,5 +1,6 @@
 package com.example.demo.controller;
 
+<<<<<<< HEAD
 import com.example.demo.dto.ApiResponse;
 import com.example.demo.dto.DoctorRequest;
 import com.example.demo.dto.DoctorStatusUpdateRequest;
@@ -19,6 +20,13 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+=======
+import com.example.demo.model.Doctor;
+import com.example.demo.repo.DoctorRepository;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+>>>>>>> parent of d8dadb9 (Reapply "Merge branch 'dev' into feature_doctor")
 
 import java.util.List;
 
@@ -71,5 +79,66 @@ public class DoctorController {
     public ApiResponse<Void> deleteDoctor(@PathVariable Long doctorId) {
         doctorService.deleteDoctor(doctorId);
         return ApiResponse.success("Doctor profile removed successfully.", null);
+<<<<<<< HEAD
+=======
+public class DoctorController {
+
+    @Autowired
+    private DoctorRepository doctorRepository;
+
+    /**
+     * Get all doctors
+     */
+    @GetMapping
+    public ResponseEntity<List<Doctor>> getAllDoctors() {
+        List<Doctor> doctors = doctorRepository.findAll();
+        return ResponseEntity.ok(doctors);
+    }
+
+    /**
+     * Get doctor by ID
+     */
+    @GetMapping("/{id}")
+    public ResponseEntity<Doctor> getDoctorById(@PathVariable int id) {
+        return doctorRepository.findById(id)
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
+    /**
+     * Create a new doctor
+     */
+    @PostMapping
+    public ResponseEntity<Doctor> createDoctor(@RequestBody Doctor doctor) {
+        Doctor savedDoctor = doctorRepository.save(doctor);
+        return ResponseEntity.ok(savedDoctor);
+    }
+
+    /**
+     * Update doctor
+     */
+    @PutMapping("/{id}")
+    public ResponseEntity<Doctor> updateDoctor(@PathVariable int id, @RequestBody Doctor doctorDetails) {
+        return doctorRepository.findById(id)
+                .map(doctor -> {
+                    doctor.setFirstName(doctorDetails.getFirstName());
+                    doctor.setLastName(doctorDetails.getLastName());
+                    doctor.setSpecialty(doctorDetails.getSpecialty());
+                    doctor.setRating(doctorDetails.getRating());
+                    doctor.setExperienceYears(doctorDetails.getExperienceYears());
+                    doctor.setPatientCount(doctorDetails.getPatientCount());
+                    return ResponseEntity.ok(doctorRepository.save(doctor));
+                })
+                .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
+    /**
+     * Delete doctor
+     */
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deleteDoctor(@PathVariable int id) {
+        doctorRepository.deleteById(id);
+        return ResponseEntity.noContent().build();
+>>>>>>> parent of d8dadb9 (Reapply "Merge branch 'dev' into feature_doctor")
     }
 }
