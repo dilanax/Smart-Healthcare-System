@@ -6,7 +6,6 @@ import com.example.demo.model.User;
 import com.example.demo.repo.UserRepository;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
@@ -29,13 +28,23 @@ import java.util.Random;
 import java.security.MessageDigest;
 
 @Service
-@RequiredArgsConstructor
+@SuppressWarnings("null")
 public class AuthServiceImpl implements AuthService, EmailService {
 
     private final UserRepository userRepository;
     private final JavaMailSender javaMailSender;
     private final BCryptPasswordEncoder passwordEncoder;
     private final ObjectMapper objectMapper;
+
+    public AuthServiceImpl(UserRepository userRepository,
+                           JavaMailSender javaMailSender,
+                           BCryptPasswordEncoder passwordEncoder,
+                           ObjectMapper objectMapper) {
+        this.userRepository = userRepository;
+        this.javaMailSender = javaMailSender;
+        this.passwordEncoder = passwordEncoder;
+        this.objectMapper = objectMapper;
+    }
 
     @Value("${app.jwt.secret}")
     private String jwtSecret;
@@ -54,18 +63,17 @@ public class AuthServiceImpl implements AuthService, EmailService {
 
         String otp = generateOtp();
 
-        User user = User.builder()
-                .firstName(requestDto.getFirstName())
-                .lastName(requestDto.getLastName())
-                .email(requestDto.getEmail())
-                .password(passwordEncoder.encode(requestDto.getPassword()))
-                .phoneNumber(requestDto.getPhoneNumber())
-                .role(role)
-                .isActive(true)
-                .otp(otp)
-                .otpExpiry(LocalDateTime.now().plusMinutes(5))
-                .otpVerified(false)
-                .build();
+        User user = new User();
+        user.setFirstName(requestDto.getFirstName());
+        user.setLastName(requestDto.getLastName());
+        user.setEmail(requestDto.getEmail());
+        user.setPassword(passwordEncoder.encode(requestDto.getPassword()));
+        user.setPhoneNumber(requestDto.getPhoneNumber());
+        user.setRole(role);
+        user.setActive(true);
+        user.setOtp(otp);
+        user.setOtpExpiry(LocalDateTime.now().plusMinutes(5));
+        user.setOtpVerified(false);
 
         userRepository.save(user);
 
@@ -155,6 +163,10 @@ public class AuthServiceImpl implements AuthService, EmailService {
 
     @Override
     public ApiResponseDto getUserById(Long userId) {
+        if (userId == null) {
+            return new ApiResponseDto("User ID cannot be null", null);
+        }
+
         Optional<User> optionalUser = userRepository.findById(userId);
 
         if (optionalUser.isEmpty()) {
@@ -165,7 +177,12 @@ public class AuthServiceImpl implements AuthService, EmailService {
     }
 
     @Override
+    @SuppressWarnings("null")
     public ApiResponseDto updateUser(Long userId, UpdateUserRequestDto requestDto) {
+        if (userId == null) {
+            return new ApiResponseDto("User ID cannot be null", null);
+        }
+
         Optional<User> optionalUser = userRepository.findById(userId);
 
         if (optionalUser.isEmpty()) {
@@ -232,7 +249,12 @@ public class AuthServiceImpl implements AuthService, EmailService {
     }
 
     @Override
+    @SuppressWarnings("null")
     public ApiResponseDto deleteUser(Long userId) {
+        if (userId == null) {
+            return new ApiResponseDto("User ID cannot be null", null);
+        }
+
         Optional<User> optionalUser = userRepository.findById(userId);
 
         if (optionalUser.isEmpty()) {
