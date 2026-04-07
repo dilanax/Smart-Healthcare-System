@@ -141,7 +141,7 @@ const AdminDashboard = ({ navigate, currentUser, refreshUser }) => {
   const loadPayments = useCallback(async () => {
   try {
     setLoading(true);
-    const response = await fetch("http://localhost:8083/payments/admin/all");
+    const response = await fetch("http://localhost:8086/payments/admin/all");
     if (response.ok) {
       const data = await response.json();
       setPayments(Array.isArray(data) ? data : data.data || []);
@@ -160,7 +160,7 @@ const deletePayment = async (paymentId) => {
 
   try {
     await fetch(
-      `http://localhost:8083/payments/admin/delete/${paymentId}`,
+      `http://localhost:8086/payments/admin/delete/${paymentId}`,
       { method: "DELETE" }
     );
     loadPayments(); // refresh table
@@ -175,7 +175,7 @@ const updatePayment = async (paymentId) => {
 
   try {
     await fetch(
-      `http://localhost:8083/payments/admin/update/${paymentId}`,
+      `http://localhost:8086/payments/admin/update/${paymentId}`,
       {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -195,7 +195,7 @@ const updatePayment = async (paymentId) => {
 const approvePayment = async (paymentId) => {
   try {
     await fetch(
-      `http://localhost:8083/payments/confirm/${paymentId}`,
+      `http://localhost:8086/payments/confirm/${paymentId}`,
       { method: "POST" }
     );
     loadPayments(); // refresh table

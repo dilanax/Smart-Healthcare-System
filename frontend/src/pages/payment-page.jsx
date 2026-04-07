@@ -30,7 +30,7 @@ const PaymentPage = ({ navigate }) => {
 
       // 1️⃣ Fetch hash from backend
       const response = await fetch(
-        "http://localhost:8083/payments/payhere-hash",
+        "http://localhost:8086/payments/payhere-hash",
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -54,7 +54,7 @@ const PaymentPage = ({ navigate }) => {
 
         return_url: "http://localhost:5173/",
         cancel_url: "http://localhost:5173/",
-        notify_url: "http://localhost:8083/payments/payhere-notify",
+        notify_url: "http://localhost:8086/payments/payhere-notify",
 
         order_id: orderId,
         items: "Doctor Appointment",
@@ -84,7 +84,7 @@ const PaymentPage = ({ navigate }) => {
   // ================================
   const handleCashPayment = async () => {
     try {
-      await fetch("http://localhost:8083/payments", {
+      await fetch("http://localhost:8086/payments", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
