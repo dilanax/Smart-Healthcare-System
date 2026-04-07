@@ -21,4 +21,10 @@ public class Payment {
     private PaymentStatus status;
 
     private String method;
+
+    
+// ✅ NEW FIELDS (Safe Addition)
+    private Double hospitalShare;   // 30%
+    private Double doctorShare;     // 70%
+
 }

@@ -783,6 +783,8 @@ const approvePayment = async (paymentId) => {
             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">ID</th>
             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">Appointment</th>
             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">Amount</th>
+            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">Hospital (30%)</th>
+            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">Doctor (70%)</th>
             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">Method</th>
             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">Status</th>
             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">Actions</th>
@@ -807,6 +809,13 @@ const approvePayment = async (paymentId) => {
                 </td>
                 <td className="px-6 py-4 text-sm font-semibold text-teal-700">
                   LKR {p.amount}
+                </td>
+                <td className="px-6 py-4 text-sm text-emerald-700 font-semibold">
+                 {p.hospitalShare != null ? `LKR ${p.hospitalShare}` : "N/A"}
+                </td>
+
+                <td className="px-6 py-4 text-sm text-indigo-700 font-semibold">
+                 {p.doctorShare != null ? `LKR ${p.doctorShare}` : "N/A"}
                 </td>
                 <td className="px-6 py-4 text-sm text-gray-600">
                   

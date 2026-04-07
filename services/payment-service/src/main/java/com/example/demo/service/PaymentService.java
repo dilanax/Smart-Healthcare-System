@@ -19,6 +19,9 @@ public class PaymentService {
     // =========================
     public Payment createPayment(Payment payment) {
 
+        // ✅ Calculate hospital & doctor shares
+      applyRevenueSplit(payment);
+
         // ✅ DO NOT override amount or status
         // PayHere / controller decides these values
         return repository.save(payment);
@@ -32,6 +35,7 @@ public class PaymentService {
                 .orElseThrow(() -> new RuntimeException("Payment not found"));
 
         payment.setStatus(PaymentStatus.SUCCESS);
+        applyRevenueSplit(payment);
         return repository.save(payment);
     }
 
@@ -61,6 +65,8 @@ public class PaymentService {
             payment.setStatus(updatedPayment.getStatus());
         }
 
+        applyRevenueSplit(payment);
+
         return repository.save(payment);
     }
 
@@ -73,4 +79,13 @@ public class PaymentService {
 
         repository.delete(payment);
     }
+
+    private void applyRevenueSplit(Payment payment) {
+    if (payment.getAmount() == null) return;
+
+    double total = payment.getAmount();
+    payment.setHospitalShare(total * 0.30);
+    payment.setDoctorShare(total * 0.70);
+}
+
 }
