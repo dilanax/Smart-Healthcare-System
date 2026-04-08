@@ -1,0 +1,165 @@
+================================================================================
+                    HEALTHCARE+ PROJECT - COLOR CODES
+================================================================================
+
+PROJECT: Smart Healthcare System
+DATE: April 8, 2026
+DESCRIPTION: Color palette used across Hero, Home Page, and UI components
+
+================================================================================
+                        MAIN COLOR SCHEME
+================================================================================
+
+PRIMARY BRAND COLORS:
+  - Teal to Cyan Gradient: #14b8a6 to #06b6d4
+  - Used for: Buttons, headers, hero gradients, primary CTAs
+  - Tailwind: from-teal-600 to-cyan-600
+
+SERVICE SPECIALTY COLORS:
+  - Cardiology (Heart):       #e53e3e (Red)
+  - Neurology (Brain):        #3182ce (Blue)
+  - Pediatrics (Children):    #38a169 (Green)
+  - Orthopedics (Bones):      #d69e2e (Orange)
+  - Pulmonology (Lungs):      #00b5d8 (Cyan)
+  - Lab Diagnostics (Test):   #805ad5 (Purple)
+
+================================================================================
+                        BACKGROUND COLORS
+================================================================================
+
+Dark Overlay (Video Background):    rgba(0, 0, 0, 0.6) — 60% black opacity
+Dark Overlay Alternative:           rgba(0, 0, 0, 0.7) — 70% black opacity
+Loading Shimmer Start:              #1e293b (Dark slate)
+Loading Shimmer Mid:                #334155 (Medium slate)
+Loading Shimmer End:                #1e293b (Dark slate)
+
+Text Colors:
+  - Primary Text:                   #ffffff (White)
+  - Secondary Text:                 #64748b (Gray)
+  - Dark Text:                       #1a202c (Almost black)
+
+================================================================================
+                        GRADIENT EXAMPLES
+================================================================================
+
+Hero Section Gradient (Left to Right):
+  from-black/70 via-black/50 to-transparent
+
+Service Card Hover:
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15)
+
+Button Gradients:
+  - Primary: bg-linear-to-r from-teal-600 to-cyan-600
+  - With opacity: from-teal-600/80 to-cyan-600/80
+
+================================================================================
+                    DEVELOPMENT FUNCTION USAGE
+================================================================================
+
+JavaScript Object for Service Colors:
+
+const serviceColors = {
+  cardiology: "#e53e3e",
+  neurology: "#3182ce",
+  pediatrics: "#38a169",
+  orthopedics: "#d69e2e",
+  pulmonology: "#00b5d8",
+  diagnostics: "#805ad5"
+};
+
+const brandColors = {
+  primary: "#14b8a6",
+  secondary: "#06b6d4",
+  darkOverlay: "rgba(0, 0, 0, 0.6)",
+  textPrimary: "#ffffff",
+  textSecondary: "#64748b"
+};
+
+Function Example - Apply Color:
+
+function getServiceColor(specialty) {
+  return serviceColors[specialty.toLowerCase()] || "#14b8a6";
+}
+
+function applyBrandGradient(element) {
+  element.style.backgroundImage = "linear-gradient(to right, #14b8a6, #06b6d4)";
+}
+
+================================================================================
+                        TAILWIND CLASS MAPPING
+================================================================================
+
+Teal:       text-teal-600, bg-teal-100, border-teal-200, hover:bg-teal-50
+Cyan:       text-cyan-600, bg-cyan-100, border-cyan-200, hover:bg-cyan-50
+Red:        text-red-600, bg-red-100, border-red-200, hover:bg-red-50
+Blue:       text-blue-600, bg-blue-100, border-blue-200, hover:bg-blue-50
+Green:      text-green-600, bg-green-100, border-green-200, hover:bg-green-50
+Orange:     text-orange-600, bg-orange-100, border-orange-200, hover:bg-orange-50
+Purple:     text-purple-600, bg-purple-100, border-purple-200, hover:bg-purple-50
+Slate:      text-slate-600, bg-slate-100, border-slate-200, hover:bg-slate-50
+
+Gradient Backgrounds:
+  bg-linear-to-r from-teal-600 to-cyan-600
+  bg-linear-to-b from-teal-500 to-cyan-600
+
+================================================================================
+                    WHERE COLORS ARE USED
+================================================================================
+
+Hero Section:
+  - Background overlay: rgba(0, 0, 0, 0.6)
+  - Titles & text: #ffffff (white)
+  - Video loading shimmer: #1e293b to #334155
+
+Service Cards:
+  - Each specialty has its own accent color (see specialty colors above)
+  - Hover effect: shadow with rgba(0, 0, 0, 0.15)
+  - Background: #ffffff (white)
+
+Buttons:
+  - Primary CTAs: Teal to Cyan gradient (#14b8a6 to #06b6d4)
+  - Secondary: White with teal text
+  - Logout: Rose/Red accent
+
+Navigation:
+  - Active link background: bg-teal-50
+  - Active link text: text-teal-700
+  - Hover: hover:bg-gray-100 hover:text-teal-600
+
+Forms & Inputs:
+  - Focus border: border-teal-500
+  - Focus background: focus:bg-white
+  - Error: border-rose-500, bg-rose-50
+
+================================================================================
+                        ACCESSIBILITY NOTES
+================================================================================
+
+- Maintain sufficient contrast between text and background
+- Dark overlay helps ensure white text is readable over images
+- Use rgba opacity for layering instead of solid colors when possible
+- Test color combinations with color blindness simulators
+- Primary interactive elements use teal (#14b8a6) for consistency
+
+================================================================================
+                        VERSION HISTORY
+================================================================================
+
+Version 1.0 - April 8, 2026
+  - Initial color palette definition
+  - Service specialty colors assigned
+  - Brand gradient established
+  - Tailwind mappings documented
+
+================================================================================
+                        CONTACT & SHARING
+================================================================================
+
+Project: Smart Healthcare System
+Repository: c:\Users\dilan\OneDrive\Desktop\sample\Smart-Healthcare-System
+Color Code File: COLOR_CODES.txt
+
+Share this file with team members to maintain color consistency across 
+the application.
+
+================================================================================

@@ -72,12 +72,6 @@ services:
       context: ./services/patient-service
       dockerfile: Dockerfile
     container_name: patient-service
-  # Payment Service
-  payment-service:
-    build:
-      context: ./services/payment-service
-      dockerfile: Dockerfile
-    container_name: payment-service
     environment:
       SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/healthcare_db?createDatabaseIfNotExist=true
       SPRING_DATASOURCE_USERNAME: healthcare
@@ -110,9 +104,6 @@ services:
       SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE: "true"
     ports:
       - "8084:8084"
-      SERVER_PORT: 8086
-    ports:
-      - "8086:8086"
     depends_on:
       mysql:
         condition: service_healthy
