@@ -361,10 +361,11 @@ public class AuthServiceImpl implements AuthService, EmailService {
         data.put("email", user.getEmail());
         data.put("role", user.getRole());
         data.put("name", user.getFirstName() + " " + user.getLastName());
-        if (user.getRole() == Role.ADMIN) {
-            data.put("accessToken", generateAdminToken(user));
-            data.put("tokenType", "Bearer");
-        }
+        
+        // This generates the token for ALL users, regardless of role!
+        data.put("accessToken", generateAdminToken(user));
+        data.put("tokenType", "Bearer");
+        
         return data;
     }
 
