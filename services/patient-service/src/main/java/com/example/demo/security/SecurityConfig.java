@@ -19,19 +19,28 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-            .csrf(csrf -> csrf.disable()) // Disable CSRF for REST APIs
-            .cors(cors -> cors.configure(http)) 
-            .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            // 1. Disable CSRF (Cross-Site Request Forgery) for REST APIs
+            .csrf(csrf -> csrf.disable()) 
+            
+            // 2. Configure which endpoints are public and which are secured
             .authorizeHttpRequests(auth -> auth
-                // You can add endpoints here that DO NOT require a token (like public info)
-                // .requestMatchers("/api/public/**").permitAll()
+                // Allow public access to auth endpoints (login, register, verify-otp)
+                .requestMatchers("/api/auth/**").permitAll() 
                 
-                // Require authentication for ALL patient endpoints
-                .requestMatchers("/api/patients/**").authenticated()
+                // IMPORTANT FIX: Whitelist the /error endpoint so Spring can return actual error messages (like 400 Bad Request) instead of throwing a 403 Forbidden
+                .requestMatchers("/error").permitAll() 
+                
+                // All other requests must be authenticated (require a JWT)
                 .anyRequest().authenticated()
             )
-            // Add our custom JWT filter before the standard Spring Security filter
-            .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+            
+            // 3. Set session management to stateless (JWTs don't use sessions)
+            .sessionManagement(session -> session
+                .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
+            );
+
+        // 4. Add your custom JWT filter before the standard authentication filter
+        http.addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }
