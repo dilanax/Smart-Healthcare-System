@@ -283,14 +283,32 @@ const AppointmentPage = ({ navigate, currentUser }) => {
         },
         body: JSON.stringify(payload),
       });
-
       if (response.ok) {
-        setGeneratedToken(token);
-        setSuccess(`✅ Appointment booked successfully! Your Appointment Token: ${token}`);
-        setTimeout(() => {
-          navigate('/');
-        }, 3000);
-      } else {
+         const appointmentResult = await response.json();
+         const appointmentId =
+         appointmentResult.appointmentId || appointmentResult.id;
+
+         setGeneratedToken(token);
+         setSuccess(`✅ Appointment booked successfully! Your Appointment Token: ${token}`);
+
+        // ✅ STEP 1 HAPPENS HERE
+        // Store appointment + doctor fee for payment page
+        localStorage.setItem(
+        "paymentInfo",
+        JSON.stringify({
+          appointmentId: appointmentId,
+          doctor: `${selectedDoctor.firstName} ${selectedDoctor.lastName}`,
+          date: appointmentDate,
+          time: selectedTime,
+          amount: selectedDoctor.consultationFee || 2500
+        })
+      );
+
+       // ✅ Go to payment page
+  navigate("/payment");
+}
+
+       else {
         const errorData = await response.json();
         setServerError(
           errorData.message || 'Failed to book appointment. Please try again.'

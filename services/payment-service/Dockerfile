@@ -1,6 +1,5 @@
-# Payment Service - Java/Spring Boot
-FROM maven:3.9-eclipse-temurin-25 AS builder
-
+# Build stage
+FROM maven:3.9-eclipse-temurin-25 AS build
 WORKDIR /app
 
 COPY pom.xml .
