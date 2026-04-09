@@ -45,13 +45,11 @@ public class AuthServiceImpl implements AuthService, EmailService {
 
     @Override
     public ApiResponseDto register(RegisterRequestDto requestDto) {
-
         if (userRepository.existsByEmail(requestDto.getEmail())) {
             return new ApiResponseDto("Email already exists", null);
         }
 
         Role role = requestDto.getRole() != null ? requestDto.getRole() : Role.PATIENT;
-
         String otp = generateOtp();
 
         User user = User.builder()
@@ -65,6 +63,8 @@ public class AuthServiceImpl implements AuthService, EmailService {
                 .otp(otp)
                 .otpExpiry(LocalDateTime.now().plusMinutes(5))
                 .otpVerified(false)
+                .createdAt(LocalDateTime.now())
+                .updatedAt(LocalDateTime.now())
                 .build();
 
         userRepository.save(user);
@@ -79,7 +79,6 @@ public class AuthServiceImpl implements AuthService, EmailService {
 
     @Override
     public ApiResponseDto login(LoginRequestDto requestDto) {
-
         Optional<User> optionalUser = userRepository.findByEmail(requestDto.getEmail());
 
         if (optionalUser.isEmpty()) {
@@ -112,7 +111,6 @@ public class AuthServiceImpl implements AuthService, EmailService {
 
     @Override
     public ApiResponseDto verifyOtp(OtpVerifyRequestDto requestDto) {
-
         Optional<User> optionalUser = userRepository.findByEmail(requestDto.getEmail());
 
         if (optionalUser.isEmpty()) {
@@ -176,28 +174,11 @@ public class AuthServiceImpl implements AuthService, EmailService {
         boolean emailChanged = false;
         String updateMessage = "User updated successfully";
 
-        String requestedEmail = requestDto.getEmail();
-        if (requestedEmail != null) {
-            requestedEmail = requestedEmail.trim().toLowerCase();
-            if (requestedEmail.isBlank()) {
-                requestedEmail = null;
+        if (requestDto.getEmail() != null && !requestDto.getEmail().equalsIgnoreCase(user.getEmail())) {
+            if (userRepository.existsByEmail(requestDto.getEmail())) {
+                return new ApiResponseDto("Email already exists", null);
             }
-        }
-
-        if (requestedEmail != null
-                && !requestedEmail.equalsIgnoreCase(user.getEmail())
-                && userRepository.existsByEmail(requestedEmail)) {
-            return new ApiResponseDto("Email already exists", null);
-        }
-
-        if (requestDto.getFirstName() != null) {
-            user.setFirstName(requestDto.getFirstName());
-        }
-        if (requestDto.getLastName() != null) {
-            user.setLastName(requestDto.getLastName());
-        }
-        if (requestedEmail != null && !requestedEmail.equalsIgnoreCase(user.getEmail())) {
-            user.setEmail(requestedEmail);
+            user.setEmail(requestDto.getEmail());
             user.setOtpVerified(false);
             String otp = generateOtp();
             user.setOtp(otp);
@@ -205,19 +186,17 @@ public class AuthServiceImpl implements AuthService, EmailService {
             emailChanged = true;
             updateMessage = "User updated successfully. New email must be verified with OTP.";
         }
+
+        if (requestDto.getFirstName() != null) user.setFirstName(requestDto.getFirstName());
+        if (requestDto.getLastName() != null) user.setLastName(requestDto.getLastName());
         if (requestDto.getPassword() != null && !requestDto.getPassword().isBlank()) {
             user.setPassword(passwordEncoder.encode(requestDto.getPassword()));
         }
-        if (requestDto.getPhoneNumber() != null) {
-            user.setPhoneNumber(requestDto.getPhoneNumber());
-        }
-        if (requestDto.getRole() != null) {
-            user.setRole(requestDto.getRole());
-        }
-        if (requestDto.getActive() != null) {
-            user.setActive(requestDto.getActive());
-        }
-
+        if (requestDto.getPhoneNumber() != null) user.setPhoneNumber(requestDto.getPhoneNumber());
+        if (requestDto.getRole() != null) user.setRole(requestDto.getRole());
+        if (requestDto.getActive() != null) user.setActive(requestDto.getActive());
+        
+        user.setUpdatedAt(LocalDateTime.now());
         User updatedUser = userRepository.save(user);
 
         if (emailChanged) {
@@ -245,41 +224,39 @@ public class AuthServiceImpl implements AuthService, EmailService {
 
     @Override
     public boolean isAdminTokenValid(String token) {
-        if (token == null || token.isBlank()) {
-            return false;
-        }
-
+        if (token == null || token.isBlank()) return false;
         try {
-            String[] parts = token.split("\\.");
-            if (parts.length != 3) {
-                return false;
-            }
-
-            String payloadJson = new String(Base64.getUrlDecoder().decode(parts[1]), StandardCharsets.UTF_8);
-            Map<String, Object> claims = objectMapper.readValue(payloadJson, new TypeReference<Map<String, Object>>() {});
-
-            String expectedSignature = sign(parts[0] + "." + parts[1]);
-            if (!MessageDigest.isEqual(expectedSignature.getBytes(StandardCharsets.UTF_8),
-                    parts[2].getBytes(StandardCharsets.UTF_8))) {
-                return false;
-            }
-
+            Map<String, Object> claims = getClaimsFromToken(token);
             Object role = claims.get("role");
-            if (role == null || !"ADMIN".equalsIgnoreCase(String.valueOf(role))) {
-                return false;
-            }
+            if (role == null || !"ADMIN".equalsIgnoreCase(String.valueOf(role))) return false;
 
-            Object exp = claims.get("exp");
-            if (exp == null) {
-                return false;
-            }
-
-            long expValue = ((Number) exp).longValue();
-            long now = LocalDateTime.now().toEpochSecond(ZoneOffset.UTC);
-            return now < expValue;
+            long expValue = ((Number) claims.get("exp")).longValue();
+            return LocalDateTime.now().toEpochSecond(ZoneOffset.UTC) < expValue;
         } catch (Exception e) {
             return false;
         }
+    }
+
+    @Override
+    public boolean isUserAuthorized(String token, Long requestedUserId) {
+        if (token == null || token.isBlank()) return false;
+        if (isAdminTokenValid(token)) return true;
+
+        try {
+            Map<String, Object> claims = getClaimsFromToken(token);
+            Object idFromToken = claims.get("id");
+            return idFromToken != null && Long.valueOf(String.valueOf(idFromToken)).equals(requestedUserId);
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    private Map<String, Object> getClaimsFromToken(String token) throws Exception {
+        String[] parts = token.split("\\.");
+        if (parts.length != 3) throw new IllegalArgumentException("Invalid token format");
+        
+        String payloadJson = new String(Base64.getUrlDecoder().decode(parts[1]), StandardCharsets.UTF_8);
+        return objectMapper.readValue(payloadJson, new TypeReference<Map<String, Object>>() {});
     }
 
     @Override
@@ -292,15 +269,13 @@ public class AuthServiceImpl implements AuthService, EmailService {
     }
 
     private String generateOtp() {
-        Random random = new Random();
-        int otpNumber = 100000 + random.nextInt(900000);
-        return String.valueOf(otpNumber);
+        return String.valueOf(100000 + new Random().nextInt(900000));
     }
 
     private String generateAdminToken(User user) {
         try {
-            long issuedAt = LocalDateTime.now().toEpochSecond(ZoneOffset.UTC);
-            long expiresAt = LocalDateTime.now().plusHours(jwtExpirationHours).toEpochSecond(ZoneOffset.UTC);
+            long now = LocalDateTime.now().toEpochSecond(ZoneOffset.UTC);
+            long exp = LocalDateTime.now().plusHours(jwtExpirationHours).toEpochSecond(ZoneOffset.UTC);
 
             Map<String, Object> header = new LinkedHashMap<>();
             header.put("alg", "HS256");
@@ -310,27 +285,21 @@ public class AuthServiceImpl implements AuthService, EmailService {
             payload.put("id", user.getId());
             payload.put("email", user.getEmail());
             payload.put("role", user.getRole().name());
-            payload.put("iat", issuedAt);
-            payload.put("exp", expiresAt);
+            payload.put("iat", now);
+            payload.put("exp", exp);
 
-            String encodedHeader = Base64.getUrlEncoder().withoutPadding()
-                    .encodeToString(objectMapper.writeValueAsBytes(header));
-            String encodedPayload = Base64.getUrlEncoder().withoutPadding()
-                    .encodeToString(objectMapper.writeValueAsBytes(payload));
-            String signature = sign(encodedHeader + "." + encodedPayload);
-
-            return encodedHeader + "." + encodedPayload + "." + signature;
+            String h = Base64.getUrlEncoder().withoutPadding().encodeToString(objectMapper.writeValueAsBytes(header));
+            String p = Base64.getUrlEncoder().withoutPadding().encodeToString(objectMapper.writeValueAsBytes(payload));
+            return h + "." + p + "." + sign(h + "." + p);
         } catch (Exception e) {
-            throw new IllegalStateException("Failed to generate JWT token", e);
+            throw new IllegalStateException("JWT generation failed", e);
         }
     }
 
     private String sign(String content) throws Exception {
         Mac sha256Hmac = Mac.getInstance("HmacSHA256");
-        SecretKeySpec secretKey = new SecretKeySpec(jwtSecret.getBytes(StandardCharsets.UTF_8), "HmacSHA256");
-        sha256Hmac.init(secretKey);
-        byte[] signedBytes = sha256Hmac.doFinal(content.getBytes(StandardCharsets.UTF_8));
-        return Base64.getUrlEncoder().withoutPadding().encodeToString(signedBytes);
+        sha256Hmac.init(new SecretKeySpec(jwtSecret.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
+        return Base64.getUrlEncoder().withoutPadding().encodeToString(sha256Hmac.doFinal(content.getBytes(StandardCharsets.UTF_8)));
     }
 
     private Map<String, Object> buildLoginResponse(User user) {
