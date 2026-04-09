@@ -19,9 +19,9 @@ docker-compose build
 
 This builds:
 - ✅ MySQL Database (8.0)
-- ✅ Auth Service (port 8081)
-- ✅ Doctor Service (port 8082)
-- ✅ Appointment Service (port 8085)
+- ✅ Auth Service (port 8083)
+- ✅ Doctor Service (port 8083)
+- ✅ Appointment Service (port 8083)
 - ✅ Frontend React App (port 5173)
 
 ### 3. Start All Services
@@ -39,9 +39,9 @@ docker-compose up -d
 | Service | URL |
 |---------|-----|
 | Frontend | http://localhost:5173 |
-| Auth API | http://localhost:8081 |
-| Doctor API | http://localhost:8082 |
-| Appointment API | http://localhost:8085 |
+| Auth API | http://localhost:8083 |
+| Doctor API | http://localhost:8083 |
+| Appointment API | http://localhost:8083 |
 | MySQL | localhost:3306 |
 
 ### 5. Stop All Services
@@ -104,7 +104,7 @@ docker-compose ps
 ### Port Already in Use
 ```bash
 # Windows: Find process using port
-netstat -ano | findstr :8081
+netstat -ano | findstr :8083
 
 # Kill process
 taskkill /PID <PID> /F
