@@ -95,6 +95,31 @@ const OtpPage = ({ navigate, refreshUser }) => {
     }
   };
 
+  const handleVerifyOtp = async (otpCode) => {
+    try {
+        const response = await API.post('/auth/verify-otp', {
+            email: location.state.email,
+            otp: otpCode
+        });
+
+        // Save the long JWT 'accessToken' you enabled in the service
+        const { accessToken, role, userId } = response.data.data;
+        localStorage.setItem('accessToken', accessToken);
+        localStorage.setItem('userRole', role);
+
+        toast.success("Login Successful!");
+
+        // Redirect based on role (Patient vs Admin)
+        if (role === 'ADMIN') {
+            navigate('/admin-dashboard');
+        } else {
+            navigate('/profile');
+        }
+    } catch (err) {
+        console.error("Verification failed", err);
+    }
+};
+
   const handleSubmit = async (event) => {
     event.preventDefault();
     setError('');
