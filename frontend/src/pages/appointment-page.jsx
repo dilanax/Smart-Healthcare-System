@@ -1,5 +1,18 @@
 import { useState, useEffect } from 'react';
 import Navbar from '../components/navbar';
+import { motion, AnimatePresence } from 'framer-motion';
+
+// Animation Variants for a modern Interactive Media feel
+const containerVariants = {
+  hidden: { opacity: 0, y: 20 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.5 } },
+  exit: { opacity: 0, scale: 0.95 }
+};
+
+const cardHover = {
+  scale: 1.03,
+  boxShadow: "0 20px 40px rgba(0, 0, 0, 0.15)", // From Brand Guide
+};
 
 const AppointmentPage = ({ navigate, currentUser }) => {
   const [doctors, setDoctors] = useState([]);
@@ -81,7 +94,7 @@ const AppointmentPage = ({ navigate, currentUser }) => {
       setLoadingSlots(true);
       // Fetch existing appointments for this doctor and date
       const response = await fetch(
-        `http://localhost:8085/api/appointments?doctorId=${selectedDoctor.userId}&appointmentDate=${appointmentDate}`
+        `http://localhost:8083/api/appointments?doctorId=${selectedDoctor.userId}&appointmentDate=${appointmentDate}`
       );
       if (response.ok) {
         const data = await response.json();
@@ -116,7 +129,7 @@ const AppointmentPage = ({ navigate, currentUser }) => {
     const fetchDoctors = async () => {
       try {
         setLoading(true);
-        const response = await fetch('http://localhost:8082/api/doctors');
+        const response = await fetch('http://localhost:8083/api/doctors');
         if (response.ok) {
           const data = await response.json();
           const doctorsList = Array.isArray(data) ? data : data.data || [];
@@ -276,7 +289,7 @@ const AppointmentPage = ({ navigate, currentUser }) => {
         token: token,
       };
 
-      const response = await fetch('http://localhost:8085/api/appointments', {
+      const response = await fetch('http://localhost:8083/api/appointments', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -317,13 +330,13 @@ const AppointmentPage = ({ navigate, currentUser }) => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-gray-50 flex flex-col">
         <Navbar navigate={navigate} currentUser={currentUser} />
-        <div className="flex items-center justify-center h-96">
-          <div className="text-center">
-            <span className="text-4xl text-teal-600 mb-4 inline-block">⏳</span>
-            <p className="text-gray-600 mt-4">Loading appointment form...</p>
-          </div>
+        <div className="flex-1 flex items-center justify-center h-96">
+          <motion.div animate={{ opacity: [0.5, 1, 0.5] }} transition={{ repeat: Infinity, duration: 1.5 }} className="text-center">
+            <span className="text-5xl text-[#14b8a6] mb-4 inline-block">⏳</span>
+            <p className="text-[#64748b] font-bold tracking-widest mt-4 uppercase">Loading appointment form...</p>
+          </motion.div>
         </div>
       </div>
     );
@@ -331,19 +344,21 @@ const AppointmentPage = ({ navigate, currentUser }) => {
 
   if (serverError && doctors.length === 0) {
     return (
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-gray-50 flex flex-col">
         <Navbar navigate={navigate} currentUser={currentUser} />
-        <div className="flex items-center justify-center h-96">
-          <div className="text-center">
-            <span className="text-4xl text-red-600 mb-4 inline-block">⚠️</span>
-            <p className="text-red-600 font-semibold mt-4">{serverError}</p>
-            <button
+        <div className="flex-1 flex items-center justify-center h-96">
+          <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="text-center bg-white p-10 rounded-3xl shadow-xl">
+            <span className="text-5xl text-red-600 mb-4 inline-block">⚠️</span>
+            <p className="text-red-600 font-bold mt-4">{serverError}</p>
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
               onClick={() => window.location.reload()}
-              className="mt-6 px-6 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700"
+              className="mt-6 px-8 py-3 bg-[#14b8a6] text-white rounded-xl font-bold shadow-md hover:bg-[#06b6d4] transition-colors"
             >
               Try Again
-            </button>
-          </div>
+            </motion.button>
+          </motion.div>
         </div>
       </div>
     );
@@ -354,21 +369,23 @@ const AppointmentPage = ({ navigate, currentUser }) => {
       <div className="min-h-screen bg-gray-50">
         <Navbar navigate={navigate} currentUser={currentUser} />
         <div className="mx-auto max-w-6xl px-4 py-12 sm:px-6 lg:px-8">
-          {/* Header */}
-          <div className="text-center mb-12">
-            <h1 className="text-5xl font-bold text-gray-900 mb-2">
+          {/* Animated Header */}
+          <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="text-center mb-12">
+            <h1 className="text-5xl font-black text-[#1a202c] mb-2 tracking-tight">
               Find a Doctor. Book an Appointment.
             </h1>
-            <p className="text-2xl font-semibold text-gray-700">Pay easy.</p>
-          </div>
+            <p className="text-2xl font-bold bg-gradient-to-r from-[#14b8a6] to-[#06b6d4] bg-clip-text text-transparent">
+              Healthcare Excellence Redefined.
+            </p>
+          </motion.div>
 
-          {/* Search Filters */}
-          <div className="bg-white rounded-2xl shadow-xl p-8 mb-12 border border-gray-200">
+          {/* Search Filters Container */}
+          <motion.div variants={containerVariants} initial="hidden" animate="visible" className="bg-white rounded-3xl shadow-xl p-8 mb-12 border border-gray-100">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
               {/* Doctor Name */}
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  👨‍⚕️ Doctor - Max 20 Characters
+                <label className="block text-xs font-black text-[#64748b] uppercase tracking-widest mb-2">
+                  👨‍⚕️ Doctor - Max 20 Chars
                 </label>
                 <input
                   type="text"
@@ -376,19 +393,19 @@ const AppointmentPage = ({ navigate, currentUser }) => {
                   placeholder="Search doctor name"
                   value={searchFilters.doctorName}
                   onChange={(e) => setSearchFilters({ ...searchFilters, doctorName: e.target.value })}
-                  className="w-full px-4 py-3 rounded-lg border-2 border-gray-300 focus:outline-none focus:border-teal-500 transition"
+                  className="w-full px-4 py-3 bg-gray-50 rounded-xl border-2 border-transparent focus:outline-none focus:border-[#14b8a6] focus:bg-white transition-all font-semibold"
                 />
               </div>
 
               {/* Hospital */}
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                <label className="block text-xs font-black text-[#64748b] uppercase tracking-widest mb-2">
                   🏥 Hospital Location
                 </label>
                 <select
                   value={searchFilters.hospital}
                   onChange={(e) => setSearchFilters({ ...searchFilters, hospital: e.target.value })}
-                  className="w-full px-4 py-3 rounded-lg border-2 border-gray-300 focus:outline-none focus:border-teal-500 transition bg-white"
+                  className="w-full px-4 py-3 bg-gray-50 rounded-xl border-2 border-transparent focus:outline-none focus:border-[#14b8a6] focus:bg-white transition-all font-semibold"
                 >
                   <option value="">All Hospitals</option>
                   <option value="Asiri">Asiri Central Hospital - Norris Canal Road-Colombo</option>
@@ -400,13 +417,13 @@ const AppointmentPage = ({ navigate, currentUser }) => {
 
               {/* Specialization */}
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                <label className="block text-xs font-black text-[#64748b] uppercase tracking-widest mb-2">
                   ⚕️ Specialization
                 </label>
                 <select
                   value={searchFilters.specialization}
                   onChange={(e) => setSearchFilters({ ...searchFilters, specialization: e.target.value })}
-                  className="w-full px-4 py-3 rounded-lg border-2 border-gray-300 focus:outline-none focus:border-teal-500 transition bg-white"
+                  className="w-full px-4 py-3 bg-gray-50 rounded-xl border-2 border-transparent focus:outline-none focus:border-[#14b8a6] focus:bg-white transition-all font-semibold"
                 >
                   <option value="">Any Specialization</option>
                   <option value="Cardiology">Cardiology</option>
@@ -419,91 +436,100 @@ const AppointmentPage = ({ navigate, currentUser }) => {
 
               {/* Date */}
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                <label className="block text-xs font-black text-[#64748b] uppercase tracking-widest mb-2">
                   📅 Any Date
                 </label>
                 <input
                   type="date"
                   value={searchFilters.searchDate}
                   onChange={(e) => setSearchFilters({ ...searchFilters, searchDate: e.target.value })}
-                  className="w-full px-4 py-3 rounded-lg border-2 border-gray-300 focus:outline-none focus:border-teal-500 transition"
+                  className="w-full px-4 py-3 bg-gray-50 rounded-xl border-2 border-transparent focus:outline-none focus:border-[#14b8a6] focus:bg-white transition-all font-semibold text-gray-700"
                 />
               </div>
             </div>
 
             {/* Search Button */}
-            <button className="w-full bg-gradient-to-r from-teal-500 to-cyan-600 hover:from-teal-600 hover:to-cyan-700 text-white font-bold py-3 rounded-lg text-lg transition shadow-lg hover:shadow-xl">
-              🔍 Search
-            </button>
-          </div>
+            <motion.button 
+              whileHover={{ scale: 1.01 }}
+              whileTap={{ scale: 0.99 }}
+              className="w-full bg-gradient-to-r from-[#14b8a6] to-[#06b6d4] hover:shadow-lg text-white font-black py-4 rounded-xl text-lg transition-all tracking-widest"
+            >
+              🔍 SEARCH
+            </motion.button>
+          </motion.div>
 
-          {/* Results */}
+          {/* Results Grid */}
           <div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-6">
+            <h2 className="text-2xl font-black text-[#1a202c] mb-6">
               {filteredDoctors.length > 0 
                 ? `Found ${filteredDoctors.length} Doctor${filteredDoctors.length !== 1 ? 's' : ''}`
                 : 'No doctors found'}
             </h2>
 
             {filteredDoctors.length === 0 ? (
-              <div className="text-center py-12 bg-white rounded-2xl shadow-lg border border-gray-200">
-                <p className="text-gray-600 text-lg mb-4">😕 No doctors match your search criteria.</p>
-                <p className="text-gray-500">Try adjusting your filters</p>
-              </div>
+              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center py-16 bg-white rounded-3xl shadow-md border border-gray-100">
+                <p className="text-[#1a202c] font-black text-xl mb-2">😕 No doctors match your search criteria.</p>
+                <p className="text-[#64748b] font-medium">Try adjusting your filters to see more availability.</p>
+              </motion.div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                {filteredDoctors.map((doctor) => (
-                  <div
-                    key={doctor.userId}
-                    onClick={() => setSelectedDoctor(doctor)}
-                    className="bg-white rounded-2xl shadow-lg overflow-hidden hover:shadow-2xl transition-all cursor-pointer hover:scale-105 transform border-2 border-transparent hover:border-teal-500"
-                  >
-                    <div className="relative h-48 bg-gradient-to-br from-teal-100 to-cyan-100">
-                      <img
-                        src={`https://i.pravatar.cc/300?u=${doctor.userId}&s=300`}
-                        alt={doctor.firstName}
-                        className="w-full h-full object-cover"
-                      />
-                      <div className="absolute top-4 right-4 bg-teal-500 text-white px-3 py-1 rounded-full text-xs font-semibold">
-                        ✓ Available
+              <motion.div layout className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+                <AnimatePresence>
+                  {filteredDoctors.map((doctor) => (
+                    <motion.div
+                      key={doctor.userId}
+                      layout
+                      variants={containerVariants}
+                      initial="hidden"
+                      animate="visible"
+                      whileHover={cardHover}
+                      onClick={() => setSelectedDoctor(doctor)}
+                      className="bg-white rounded-3xl shadow-sm overflow-hidden cursor-pointer border-2 border-transparent hover:border-[#14b8a6] group transition-colors"
+                    >
+                      <div className="relative h-56 bg-gray-100 overflow-hidden">
+                        <img
+                          src={`https://i.pravatar.cc/300?u=${doctor.userId}&s=300`}
+                          alt={doctor.firstName}
+                          className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                        />
+                        <div className="absolute top-4 right-4 bg-white/90 backdrop-blur-sm text-[#14b8a6] px-4 py-1 rounded-full text-xs font-black shadow-sm">
+                          ✓ AVAILABLE
+                        </div>
                       </div>
-                    </div>
 
-                    <div className="p-6">
-                      <h3 className="text-lg font-bold text-gray-900">
-                        Dr. {doctor.firstName} {doctor.lastName}
-                      </h3>
-                      {doctor.specialization && (
-                        <p className="text-teal-600 font-semibold mb-3">{doctor.specialization}</p>
-                      )}
+                      <div className="p-6">
+                        <h3 className="text-xl font-black text-[#1a202c]">
+                          Dr. {doctor.firstName} {doctor.lastName}
+                        </h3>
+                        {doctor.specialization && (
+                          <p className="text-[#14b8a6] font-bold mb-4">{doctor.specialization}</p>
+                        )}
 
-                      <div className="flex items-center gap-2 mb-3">
-                        <div className="flex text-yellow-400">
+                        <div className="flex items-center gap-1 text-yellow-400 mb-4">
                           {[...Array(5)].map((_, i) => (
                             <span key={i} className="text-sm">⭐</span>
                           ))}
+                          <span className="text-[#64748b] text-xs ml-2 font-bold">(5.0)</span>
                         </div>
-                        <span className="text-sm text-gray-600">5.0</span>
-                      </div>
 
-                      <div className="grid grid-cols-2 gap-3 mb-4 text-xs text-gray-600">
-                        <div>
-                          <p className="font-semibold text-gray-800">10+ yrs</p>
-                          <p>Experience</p>
+                        <div className="grid grid-cols-2 gap-3 mb-6 text-xs text-gray-600">
+                          <div>
+                            <p className="font-black text-[#1a202c]">10+ yrs</p>
+                            <p className="font-medium text-[#64748b]">Experience</p>
+                          </div>
+                          <div>
+                            <p className="font-black text-[#1a202c]">5,000+</p>
+                            <p className="font-medium text-[#64748b]">Patients</p>
+                          </div>
                         </div>
-                        <div>
-                          <p className="font-semibold text-gray-800">5,000+</p>
-                          <p>Patients</p>
+
+                        <div className="w-full py-3 bg-teal-50 text-[#14b8a6] rounded-xl text-center font-black text-sm group-hover:bg-gradient-to-r group-hover:from-[#14b8a6] group-hover:to-[#06b6d4] group-hover:text-white transition-all shadow-sm">
+                          SELECT DOCTOR
                         </div>
                       </div>
-
-                      <button className="w-full bg-gradient-to-r from-teal-500 to-cyan-600 hover:from-teal-600 hover:to-cyan-700 text-white py-2 rounded-lg font-semibold transition shadow-md hover:shadow-lg">
-                        Select Doctor
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
+                    </motion.div>
+                  ))}
+                </AnimatePresence>
+              </motion.div>
             )}
           </div>
         </div>
@@ -511,87 +537,100 @@ const AppointmentPage = ({ navigate, currentUser }) => {
     );
   }
 
+  // --- FINAL BOOKING FORM VIEW ---
   return (
     <div className="min-h-screen bg-gray-50">
       <Navbar navigate={navigate} currentUser={currentUser} />
 
       <div className="mx-auto max-w-4xl px-4 py-12 sm:px-6 lg:px-8">
+        
         {/* Doctor Details Header */}
-        {selectedDoctor && (
-          <div className="mb-8 bg-linear-to-r from-teal-500 to-cyan-500 rounded-2xl p-8 shadow-xl text-white">
-            <div className="flex items-center justify-between gap-6">
-              <div className="flex items-center gap-6 flex-1">
-                <img
-                  src={`https://i.pravatar.cc/200?u=${selectedDoctor.userId}&s=200`}
-                  alt={selectedDoctor.firstName}
-                  className="w-24 h-24 rounded-full border-4 border-white"
-                />
-                <div className="flex-1">
-                  <h2 className="text-3xl font-bold">
-                    Dr. {selectedDoctor.firstName} {selectedDoctor.lastName}
-                  </h2>
-                  <p className="text-teal-100 text-lg font-semibold">Specialist</p>
-                  <div className="mt-3 flex gap-6">
-                    <div>
-                      <p className="text-teal-100 text-sm">Experience</p>
-                      <p className="font-bold text-lg">10+ Years</p>
-                    </div>
-                    <div>
-                      <p className="text-teal-100 text-sm">Patients</p>
-                      <p className="font-bold text-lg">5,000+</p>
-                    </div>
-                    <div>
-                      <p className="text-teal-100 text-sm">Rating</p>
-                      <p className="font-bold text-lg">⭐ 5.0</p>
+        <AnimatePresence>
+          {selectedDoctor && (
+            <motion.div 
+              initial={{ scale: 0.95, opacity: 0 }} 
+              animate={{ scale: 1, opacity: 1 }}
+              className="mb-8 bg-gradient-to-r from-[#14b8a6] to-[#06b6d4] rounded-3xl p-8 shadow-2xl text-white"
+            >
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+                <div className="flex items-center gap-6 flex-1">
+                  <img
+                    src={`https://i.pravatar.cc/200?u=${selectedDoctor.userId}&s=200`}
+                    alt={selectedDoctor.firstName}
+                    className="w-24 h-24 rounded-2xl border-4 border-white/30 shadow-lg"
+                  />
+                  <div className="flex-1">
+                    <h2 className="text-3xl font-black drop-shadow-md">
+                      Dr. {selectedDoctor.firstName} {selectedDoctor.lastName}
+                    </h2>
+                    <p className="text-teal-50 font-bold tracking-widest uppercase text-sm mt-1">Specialist</p>
+                    <div className="mt-4 flex gap-8">
+                      <div>
+                        <p className="text-teal-100 text-xs font-bold uppercase tracking-widest">Experience</p>
+                        <p className="font-black text-lg">10+ Years</p>
+                      </div>
+                      <div>
+                        <p className="text-teal-100 text-xs font-bold uppercase tracking-widest">Patients</p>
+                        <p className="font-black text-lg">5,000+</p>
+                      </div>
+                      <div>
+                        <p className="text-teal-100 text-xs font-bold uppercase tracking-widest">Rating</p>
+                        <p className="font-black text-lg">⭐ 5.0</p>
+                      </div>
                     </div>
                   </div>
                 </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedDoctor(null);
+                    setSearchFilters({
+                      doctorName: '',
+                      hospital: '',
+                      specialization: '',
+                      searchDate: '',
+                    });
+                  }}
+                  className="px-6 py-3 bg-white/10 hover:bg-white/20 font-bold rounded-xl transition backdrop-blur-sm shadow-sm"
+                >
+                  Change Doctor
+                </button>
               </div>
-              <button
-                type="button"
-                onClick={() => {
-                  setSelectedDoctor(null);
-                  setSearchFilters({
-                    doctorName: '',
-                    hospital: '',
-                    specialization: '',
-                    searchDate: '',
-                  });
-                }}
-                className="px-6 py-2 bg-white text-teal-600 font-semibold rounded-lg hover:bg-gray-100 transition"
-              >
-                Change Doctor
-              </button>
-            </div>
-          </div>
-        )}
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Success Message */}
-        {success && (
-          <div className="mb-6 rounded-lg bg-green-50 p-4 border-l-4 border-green-500">
-            <p className="text-green-800 font-semibold">{success}</p>
-          </div>
-        )}
+        <AnimatePresence>
+          {success && (
+            <motion.div initial={{opacity:0, y:-10}} animate={{opacity:1, y:0}} className="mb-6 rounded-2xl bg-teal-50 p-6 border-l-4 border-[#14b8a6] shadow-sm">
+              <p className="text-teal-800 font-bold">{success}</p>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Error Message */}
-        {serverError && (
-          <div className="mb-6 rounded-lg bg-red-50 p-4 border-l-4 border-red-500">
-            <p className="text-red-800">{serverError}</p>
-          </div>
-        )}
+        <AnimatePresence>
+          {serverError && (
+            <motion.div initial={{opacity:0, y:-10}} animate={{opacity:1, y:0}} className="mb-6 rounded-2xl bg-red-50 p-6 border-l-4 border-red-500 shadow-sm">
+              <p className="text-red-800 font-bold">{serverError}</p>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
-        {/* Appointment Form */}
-        <form onSubmit={handleSubmit} className="bg-white rounded-2xl p-8 shadow-lg space-y-8">
+        {/* Appointment Form Container */}
+        <motion.form variants={containerVariants} initial="hidden" animate="visible" onSubmit={handleSubmit} className="bg-white rounded-3xl p-10 shadow-xl space-y-10 border border-gray-100">
+          
           {/* User Details Section */}
-          <div className="bg-gradient-to-r from-teal-50 to-cyan-50 rounded-xl p-6 border-l-4 border-teal-500">
-            <h3 className="text-lg font-bold text-gray-800 mb-6">
+          <div className="bg-[#f8fafc] rounded-3xl p-8 border-l-8 border-[#14b8a6]">
+            <h3 className="text-xl font-black text-[#1a202c] mb-8">
               👤 Your Details
             </h3>
 
-            <div className="grid md:grid-cols-2 gap-4">
+            <div className="grid md:grid-cols-2 gap-6">
               {/* Full Name */}
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                <label className="block text-xs font-black text-[#64748b] uppercase tracking-widest mb-2">
                   Full Name <span className="text-red-500">*</span>
                 </label>
                 <input
@@ -599,22 +638,20 @@ const AppointmentPage = ({ navigate, currentUser }) => {
                   value={userDetails.name}
                   onChange={(e) => handleUserDetailsChange('name', e.target.value)}
                   placeholder="Enter your full name"
-                  className={`w-full px-4 py-2 rounded-lg border-2 transition-colors focus:outline-none ${
+                  className={`w-full px-4 py-3 bg-white rounded-xl border-2 transition-colors focus:outline-none font-semibold ${
                     errors.name
-                      ? 'border-red-500 bg-red-50 focus:border-red-600'
-                      : 'border-gray-200 bg-white focus:border-teal-500'
+                      ? 'border-red-400 focus:border-red-500'
+                      : 'border-gray-200 focus:border-[#14b8a6]'
                   }`}
                 />
                 {errors.name && (
-                  <p className="mt-1 text-xs text-red-600">
-                    ⚠️ {errors.name}
-                  </p>
+                  <p className="mt-1 text-xs text-red-500 font-bold">⚠️ {errors.name}</p>
                 )}
               </div>
 
               {/* Email */}
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                <label className="block text-xs font-black text-[#64748b] uppercase tracking-widest mb-2">
                   Email Address <span className="text-red-500">*</span>
                 </label>
                 <input
@@ -622,22 +659,20 @@ const AppointmentPage = ({ navigate, currentUser }) => {
                   value={userDetails.email}
                   onChange={(e) => handleUserDetailsChange('email', e.target.value)}
                   placeholder="Enter your email"
-                  className={`w-full px-4 py-2 rounded-lg border-2 transition-colors focus:outline-none ${
+                  className={`w-full px-4 py-3 bg-white rounded-xl border-2 transition-colors focus:outline-none font-semibold ${
                     errors.email
-                      ? 'border-red-500 bg-red-50 focus:border-red-600'
-                      : 'border-gray-200 bg-white focus:border-teal-500'
+                      ? 'border-red-400 focus:border-red-500'
+                      : 'border-gray-200 focus:border-[#14b8a6]'
                   }`}
                 />
                 {errors.email && (
-                  <p className="mt-1 text-xs text-red-600">
-                    ⚠️ {errors.email}
-                  </p>
+                  <p className="mt-1 text-xs text-red-500 font-bold">⚠️ {errors.email}</p>
                 )}
               </div>
 
               {/* Phone Number */}
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                <label className="block text-xs font-black text-[#64748b] uppercase tracking-widest mb-2">
                   Phone Number <span className="text-red-500">*</span>
                 </label>
                 <input
@@ -645,22 +680,20 @@ const AppointmentPage = ({ navigate, currentUser }) => {
                   value={userDetails.phone}
                   onChange={(e) => handleUserDetailsChange('phone', e.target.value)}
                   placeholder="Enter 10-digit phone number"
-                  className={`w-full px-4 py-2 rounded-lg border-2 transition-colors focus:outline-none ${
+                  className={`w-full px-4 py-3 bg-white rounded-xl border-2 transition-colors focus:outline-none font-semibold ${
                     errors.phone
-                      ? 'border-red-500 bg-red-50 focus:border-red-600'
-                      : 'border-gray-200 bg-white focus:border-teal-500'
+                      ? 'border-red-400 focus:border-red-500'
+                      : 'border-gray-200 focus:border-[#14b8a6]'
                   }`}
                 />
                 {errors.phone && (
-                  <p className="mt-1 text-xs text-red-600">
-                    ⚠️ {errors.phone}
-                  </p>
+                  <p className="mt-1 text-xs text-red-500 font-bold">⚠️ {errors.phone}</p>
                 )}
               </div>
 
               {/* Age */}
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                <label className="block text-xs font-black text-[#64748b] uppercase tracking-widest mb-2">
                   Age <span className="text-red-500">*</span>
                 </label>
                 <input
@@ -670,31 +703,29 @@ const AppointmentPage = ({ navigate, currentUser }) => {
                   placeholder="Enter your age"
                   min="1"
                   max="150"
-                  className={`w-full px-4 py-2 rounded-lg border-2 transition-colors focus:outline-none ${
+                  className={`w-full px-4 py-3 bg-white rounded-xl border-2 transition-colors focus:outline-none font-semibold ${
                     errors.age
-                      ? 'border-red-500 bg-red-50 focus:border-red-600'
-                      : 'border-gray-200 bg-white focus:border-teal-500'
+                      ? 'border-red-400 focus:border-red-500'
+                      : 'border-gray-200 focus:border-[#14b8a6]'
                   }`}
                 />
                 {errors.age && (
-                  <p className="mt-1 text-xs text-red-600">
-                    ⚠️ {errors.age}
-                  </p>
+                  <p className="mt-1 text-xs text-red-500 font-bold">⚠️ {errors.age}</p>
                 )}
               </div>
 
               {/* Gender */}
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                <label className="block text-xs font-black text-[#64748b] uppercase tracking-widest mb-2">
                   Gender <span className="text-red-500">*</span>
                 </label>
                 <select
                   value={userDetails.gender}
                   onChange={(e) => handleUserDetailsChange('gender', e.target.value)}
-                  className={`w-full px-4 py-2 rounded-lg border-2 transition-colors focus:outline-none ${
+                  className={`w-full px-4 py-3 bg-white rounded-xl border-2 transition-colors focus:outline-none font-semibold ${
                     errors.gender
-                      ? 'border-red-500 bg-red-50 focus:border-red-600'
-                      : 'border-gray-200 bg-white focus:border-teal-500'
+                      ? 'border-red-400 focus:border-red-500'
+                      : 'border-gray-200 focus:border-[#14b8a6]'
                   }`}
                 >
                   <option value="">Select Gender</option>
@@ -703,196 +734,190 @@ const AppointmentPage = ({ navigate, currentUser }) => {
                   <option value="Other">Other</option>
                 </select>
                 {errors.gender && (
-                  <p className="mt-1 text-xs text-red-600">
-                    ⚠️ {errors.gender}
-                  </p>
+                  <p className="mt-1 text-xs text-red-500 font-bold">⚠️ {errors.gender}</p>
                 )}
               </div>
 
               {/* Patient ID */}
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                <label className="block text-xs font-black text-[#64748b] uppercase tracking-widest mb-2">
                   Patient ID
                 </label>
                 <input
                   type="text"
                   value={patientId}
                   disabled
-                  className="w-full px-4 py-2 rounded-lg border-2 border-gray-200 bg-gray-100 text-gray-600 cursor-not-allowed"
+                  className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 bg-gray-100 text-gray-500 cursor-not-allowed font-semibold"
                 />
               </div>
             </div>
           </div>
 
-          {/* Date Selection */}
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-3">
-              Select Appointment Date <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="date"
-              value={appointmentDate}
-              onChange={handleDateChange}
-              min={getTodayDate()}
-              max={getMaxDate()}
-              className={`w-full px-4 py-3 rounded-lg border-2 transition-colors focus:outline-none ${
-                errors.date
-                  ? 'border-red-500 bg-red-50 focus:border-red-600'
-                  : 'border-gray-200 bg-white focus:border-teal-500'
-              }`}
-            />
-            {errors.date && (
-              <p className="mt-2 text-sm text-red-600">
-                ⚠️ {errors.date}
-              </p>
-            )}
-          </div>
+          <div className="space-y-6 border-t border-gray-100 pt-8">
+            <h3 className="text-xl font-black text-[#1a202c]">Schedule</h3>
 
-          {/* Time Slots */}
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-3">
-              Select Time Slot <span className="text-red-500">*</span>
-            </label>
-            {loadingSlots && (
-              <p className="text-sm text-gray-600 mb-3">⏳ Loading available slots...</p>
-            )}
-            <div className="bg-gradient-to-br from-purple-50 to-indigo-50 p-6 rounded-xl border-2 border-purple-200">
-              <p className="text-gray-700 font-semibold mb-4 text-sm">🕐 Select Your Time Slot:</p>
-              <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 gap-3">
-                {availableSlots.map((time) => {
-                  const isBooked = isSlotBooked(time);
-                  return (
-                    <button
-                      key={time}
-                      type="button"
-                      disabled={isBooked}
-                      onClick={() => !isBooked && handleTimeSelect(time)}
-                      className={`py-4 px-3 rounded-xl font-bold transition-all text-sm transform border-2 ${
-                        isBooked
-                          ? 'bg-red-500 text-white cursor-not-allowed hover:bg-red-500 border-red-600 shadow-md' // Booked - Bright Red, cannot click
-                          : selectedTime === time
-                          ? 'bg-gradient-to-br from-teal-500 to-cyan-600 text-white shadow-xl scale-110 ring-4 ring-teal-300 border-teal-700' // Selected - Teal gradient + scale + ring
-                          : 'bg-white text-indigo-700 hover:bg-indigo-50 border-indigo-300 shadow-sm hover:shadow-md' // Available - White with indigo border
-                      }`}
-                      title={isBooked ? `❌ BOOKED - Not available` : `✅ AVAILABLE - Click to select`}
-                    >
-                      <div className="text-sm font-bold">{time}</div>
-                      <div className="text-xl">{isBooked ? '❌' : '✅'}</div>
-                      {isBooked && <div className="text-xs font-semibold mt-1">BOOKED</div>}
-                    </button>
-                  );
-                })}
-              </div>
+            {/* Date Selection */}
+            <div>
+              <label className="block text-xs font-black text-[#64748b] uppercase tracking-widest mb-3">
+                Select Appointment Date <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="date"
+                value={appointmentDate}
+                onChange={handleDateChange}
+                min={getTodayDate()}
+                max={getMaxDate()}
+                className={`w-full md:w-1/2 px-4 py-4 bg-gray-50 rounded-2xl border-2 outline-none font-bold text-gray-700 transition ${
+                  errors.date
+                    ? 'border-red-400 focus:border-red-500'
+                    : 'border-gray-200 focus:border-[#14b8a6]'
+                }`}
+              />
+              {errors.date && (
+                <p className="mt-2 text-xs text-red-500 font-bold">⚠️ {errors.date}</p>
+              )}
             </div>
-            {errors.time && (
-              <p className="mt-2 text-sm text-red-600">
-                ⚠️ {errors.time}
-              </p>
-            )}
+
+            {/* Time Slots */}
+            <div>
+              <label className="block text-xs font-black text-[#64748b] uppercase tracking-widest mb-4">
+                Select Time Slot <span className="text-red-500">*</span>
+                {loadingSlots && <span className="text-[#14b8a6] ml-2 normal-case tracking-normal">(loading...)</span>}
+              </label>
+              
+              <div className="bg-gray-50 p-6 rounded-2xl border border-gray-100">
+                <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 gap-3">
+                  {availableSlots.map((time) => {
+                    const isBooked = isSlotBooked(time);
+                    return (
+                      <motion.button
+                        key={time}
+                        type="button"
+                        disabled={isBooked}
+                        whileHover={!isBooked ? { scale: 1.05 } : {}}
+                        whileTap={!isBooked ? { scale: 0.95 } : {}}
+                        onClick={() => !isBooked && handleTimeSelect(time)}
+                        className={`py-4 px-3 rounded-xl font-black text-sm transition-all border-2 ${
+                          isBooked
+                            ? 'bg-red-50 text-red-300 border-red-100 cursor-not-allowed shadow-none' // Subdued booked state based on Brand Guide
+                            : selectedTime === time
+                            ? 'bg-gradient-to-br from-[#14b8a6] to-[#06b6d4] text-white border-[#14b8a6] shadow-lg shadow-teal-500/30' // Selected - Teal gradient
+                            : 'bg-white text-[#1a202c] border-gray-200 hover:border-[#14b8a6] hover:text-[#14b8a6] shadow-sm' // Available
+                        }`}
+                        title={isBooked ? `❌ BOOKED - Not available` : `✅ AVAILABLE - Click to select`}
+                      >
+                        <div className="text-sm font-bold">{time}</div>
+                        {isBooked && <div className="text-[10px] uppercase font-bold mt-1 tracking-widest">Booked</div>}
+                      </motion.button>
+                    );
+                  })}
+                </div>
+              </div>
+              {errors.time && (
+                <p className="mt-2 text-xs text-red-500 font-bold">⚠️ {errors.time}</p>
+              )}
+            </div>
           </div>
 
           {/* Reason Textarea */}
-          <div>
-            <label htmlFor="reason" className="block text-sm font-semibold text-gray-700 mb-3">
-              Reason for Appointment <span className="text-red-500">*</span>
+          <div className="border-t border-gray-100 pt-8">
+            <label htmlFor="reason" className="block text-xs font-black text-[#64748b] uppercase tracking-widest mb-3">
+              Reason for Visit <span className="text-red-500">*</span>
             </label>
             <textarea
               id="reason"
               value={reason}
               onChange={handleReasonChange}
-              placeholder="Describe your symptoms or reason for visit (10-200 characters)"
+              placeholder="Briefly describe your symptoms or reason for visit (10-200 characters)"
               rows="5"
-              className={`w-full px-4 py-3 rounded-lg border-2 transition-colors focus:outline-none resize-none ${
+              className={`w-full p-6 bg-gray-50 rounded-2xl border-2 transition-colors focus:outline-none resize-none font-medium ${
                 errors.reason
-                  ? 'border-red-500 bg-red-50 focus:border-red-600'
-                  : 'border-gray-200 bg-white focus:border-teal-500'
+                  ? 'border-red-400 focus:border-red-500'
+                  : 'border-gray-200 focus:border-[#14b8a6]'
               }`}
             />
             <div className="mt-2 flex items-center justify-between">
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-[#64748b] font-bold">
                 ℹ️ {reason.length}/200 characters
               </p>
               <div className="w-32 bg-gray-200 rounded-full h-2">
                 <div
-                  className="bg-teal-600 h-2 rounded-full transition-all"
+                  className="bg-[#14b8a6] h-2 rounded-full transition-all"
                   style={{ width: `${(reason.length / 200) * 100}%` }}
                 ></div>
               </div>
             </div>
             {errors.reason && (
-              <p className="mt-2 text-sm text-red-600">
-                ⚠️ {errors.reason}
-              </p>
+              <p className="mt-2 text-xs text-red-500 font-bold">⚠️ {errors.reason}</p>
             )}
           </div>
 
           {/* Appointment Summary */}
-          {appointmentDate && selectedTime && (
-            <div className="bg-linear-to-r from-teal-50 to-cyan-50 border-l-4 border-teal-500 rounded-lg p-6">
-              <h3 className="font-bold text-gray-800 mb-4">Appointment Summary</h3>
-              <div className="grid md:grid-cols-5 gap-4 text-sm">
-                <div>
-                  <p className="text-gray-600">Patient</p>
-                  <p className="font-semibold text-gray-800">{userDetails.name || 'N/A'}</p>
+          <AnimatePresence>
+            {appointmentDate && selectedTime && (
+              <motion.div 
+                initial={{ opacity: 0, height: 0 }} 
+                animate={{ opacity: 1, height: 'auto' }}
+                className="bg-gradient-to-r from-teal-50 to-cyan-50 border-l-4 border-[#14b8a6] rounded-2xl p-8 overflow-hidden"
+              >
+                <h3 className="font-black text-[#1a202c] mb-6 text-lg">Appointment Summary</h3>
+                <div className="grid md:grid-cols-5 gap-6 text-sm">
+                  <div>
+                    <p className="text-[#64748b] text-xs font-bold uppercase tracking-widest">Patient</p>
+                    <p className="font-black text-[#1a202c] text-base mt-1">{userDetails.name || 'N/A'}</p>
+                  </div>
+                  <div className="md:col-span-2">
+                    <p className="text-[#64748b] text-xs font-bold uppercase tracking-widest">Doctor</p>
+                    <p className="font-black text-[#1a202c] text-base mt-1">
+                      Dr. {selectedDoctor.firstName} {selectedDoctor.lastName}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[#64748b] text-xs font-bold uppercase tracking-widest">Date & Time</p>
+                    <p className="font-black text-[#1a202c] text-base mt-1">
+                      {new Date(appointmentDate).toLocaleDateString('en-US', { 
+                        month: 'short', 
+                        day: 'numeric'
+                      })} @ {selectedTime}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[#64748b] text-xs font-bold uppercase tracking-widest">ID</p>
+                    <p className="font-black text-[#1a202c] text-base mt-1">{patientId}</p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-gray-600">Doctor</p>
-                  <p className="font-semibold text-gray-800">
-                    Dr. {selectedDoctor.firstName} {selectedDoctor.lastName}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-gray-600">Date</p>
-                  <p className="font-semibold text-gray-800">
-                    {new Date(appointmentDate).toLocaleDateString('en-US', { 
-                      weekday: 'short', 
-                      month: 'short', 
-                      day: 'numeric',
-                      year: 'numeric'
-                    })}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-gray-600">Time</p>
-                  <p className="font-semibold text-gray-800">{selectedTime}</p>
-                </div>
-                <div>
-                  <p className="text-gray-600">Patient ID</p>
-                  <p className="font-semibold text-gray-800">{patientId}</p>
-                </div>
-              </div>
-            </div>
-          )}
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           {/* Submit Buttons */}
-          <div className="flex gap-4 pt-6 border-t-2 border-gray-100">
-            <button
+          <div className="flex flex-col sm:flex-row gap-4 pt-8 border-t border-gray-100">
+            <motion.button
               type="submit"
               disabled={isSubmitting}
-              className="flex-1 rounded-lg bg-gradient-to-r from-teal-500 to-cyan-600 hover:from-teal-600 hover:to-cyan-700 px-6 py-3 font-semibold text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg hover:shadow-xl"
+              whileHover={{ scale: 1.02 }} 
+              whileTap={{ scale: 0.98 }}
+              className="flex-1 rounded-2xl bg-gradient-to-r from-[#14b8a6] to-[#06b6d4] px-8 py-5 font-black text-white shadow-xl shadow-teal-500/20 transition-all disabled:opacity-50 tracking-widest flex items-center justify-center gap-2"
             >
               {isSubmitting ? (
                 <>
-                  <span>⏳</span>
-                  Booking...
+                  <span>⏳</span> BOOKING...
                 </>
               ) : (
                 <>
-                  <span>✅</span>
-                  Confirm Appointment
+                  <span>✅</span> CONFIRM APPOINTMENT
                 </>
               )}
-            </button>
+            </motion.button>
             <button
               type="button"
               onClick={() => navigate('/')}
-              className="flex-1 rounded-lg bg-gray-200 hover:bg-gray-300 px-6 py-3 font-semibold text-gray-800 transition-all flex items-center justify-center gap-2"
+              className="px-10 py-5 rounded-2xl bg-gray-100 hover:bg-gray-200 font-bold text-[#64748b] transition-colors tracking-widest flex items-center justify-center gap-2"
             >
-              <span>❌</span>
-              Cancel
+              <span>❌</span> CANCEL
             </button>
           </div>
-        </form>
+        </motion.form>
       </div>
     </div>
   );
