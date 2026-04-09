@@ -30,7 +30,7 @@ services:
       SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/healthcare_db?createDatabaseIfNotExist=true
       SPRING_DATASOURCE_USERNAME: healthcare
       SPRING_DATASOURCE_PASSWORD: 123456
-      SERVER_PORT: 8081
+      SERVER_PORT: 8083
       SPRING_MAIL_HOST: smtp.gmail.com
       SPRING_MAIL_PORT: 587
       SPRING_MAIL_USERNAME: dilanavishka183@gmail.com
@@ -40,7 +40,7 @@ services:
       APP_JWT_SECRET: my-super-secret-key-change-this-in-production
       APP_JWT_EXPIRATION_HOURS: 8
     ports:
-      - "8081:8081"
+      - "8083:8083"
     depends_on:
       mysql:
         condition: service_healthy
@@ -57,9 +57,9 @@ services:
       SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/healthcare_db?createDatabaseIfNotExist=true
       SPRING_DATASOURCE_USERNAME: healthcare
       SPRING_DATASOURCE_PASSWORD: 123456
-      SERVER_PORT: 8082
+      SERVER_PORT: 8083
     ports:
-      - "8082:8082"
+      - "8083:8083"
     depends_on:
       mysql:
         condition: service_healthy
@@ -120,9 +120,9 @@ services:
       SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/healthcare_db?createDatabaseIfNotExist=true
       SPRING_DATASOURCE_USERNAME: healthcare
       SPRING_DATASOURCE_PASSWORD: 123456
-      SERVER_PORT: 8085
+      SERVER_PORT: 8083
     ports:
-      - "8085:8085"
+      - "8083:8083"
     depends_on:
       mysql:
         condition: service_healthy
@@ -157,7 +157,7 @@ services:
     ports:
       - "5173:5173"
     environment:
-      VITE_API_BASE_URL: http://localhost:8081
+      VITE_API_BASE_URL: http://localhost:8083
     depends_on:
       - auth-service
       - doctor-service
