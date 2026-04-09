@@ -89,9 +89,9 @@
 ## 🔗 API Endpoints Used
 
 ### Backend Endpoints:
-- **POST** `http://localhost:8085/api/appointments` - Create appointment
-- **GET** `http://localhost:8085/api/appointments` - Fetch all appointments
-- **GET** `http://localhost:8082/api/doctors` - Fetch doctors list
+- **POST** `http://localhost:8083/api/appointments` - Create appointment
+- **GET** `http://localhost:8083/api/appointments` - Fetch all appointments
+- **GET** `http://localhost:8083/api/doctors` - Fetch doctors list
 
 ---
 
@@ -155,7 +155,7 @@
 ### Create Appointment Request:
 ```
 Method: POST
-URL: http://localhost:8085/api/appointments
+URL: http://localhost:8083/api/appointments
 Content-Type: application/json
 
 Body:
@@ -171,7 +171,7 @@ Body:
 ### Get All Appointments:
 ```
 Method: GET
-URL: http://localhost:8085/api/appointments
+URL: http://localhost:8083/api/appointments
 ```
 
 ---
@@ -198,8 +198,8 @@ URL: http://localhost:8085/api/appointments
 ## 🔧 Backend Requirements
 
 Ensure your backend services are running:
-- **Appointment Service:** `http://localhost:8085`
-- **Doctor Service:** `http://localhost:8082`
+- **Appointment Service:** `http://localhost:8083`
+- **Doctor Service:** `http://localhost:8083`
 
 The appointment service should have:
 - `POST /api/appointments` endpoint
