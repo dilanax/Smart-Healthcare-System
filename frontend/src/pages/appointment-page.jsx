@@ -94,7 +94,7 @@ const AppointmentPage = ({ navigate, currentUser }) => {
       setLoadingSlots(true);
       // Fetch existing appointments for this doctor and date
       const response = await fetch(
-        `http://localhost:8083/api/appointments?doctorId=${selectedDoctor.userId}&appointmentDate=${appointmentDate}`
+        `http://localhost:8085/api/appointments?doctorId=${selectedDoctor.userId}&appointmentDate=${appointmentDate}`
       );
       if (response.ok) {
         const data = await response.json();
@@ -129,7 +129,7 @@ const AppointmentPage = ({ navigate, currentUser }) => {
     const fetchDoctors = async () => {
       try {
         setLoading(true);
-        const response = await fetch('http://localhost:8083/api/doctors');
+        const response = await fetch('http://localhost:8082/api/doctors');
         if (response.ok) {
           const data = await response.json();
           const doctorsList = Array.isArray(data) ? data : data.data || [];
@@ -289,7 +289,7 @@ const AppointmentPage = ({ navigate, currentUser }) => {
         token: token,
       };
 
-      const response = await fetch('http://localhost:8083/api/appointments', {
+      const response = await fetch('http://localhost:8085/api/appointments', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

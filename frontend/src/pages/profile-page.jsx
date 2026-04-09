@@ -5,274 +5,103 @@ const ProfilePage = ({ navigate, currentUser }) => {
   const [userDetails, setUserDetails] = useState(null);
   const [appointments, setAppointments] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [isEditing, setIsEditing] = useState(false);
+  const [editForm, setEditForm] = useState({
+    firstName: '', lastName: '', phoneNumber: '', age: '', gender: ''
+  });
+
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      const token = localStorage.getItem('healthcare_auth_token');
+      const userRes = await fetch(`http://localhost:8081/api/auth/user/${currentUser.userId}`, {
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
+      });
+
+      if (userRes.ok) {
+        const userData = await userRes.json();
+        const user = userData.data || userData;
+        setUserDetails(user);
+        setEditForm(user);
+      }
+
+      const apptRes = await fetch(`http://localhost:8085/api/appointments?patientId=${currentUser.userId}`);
+      if (apptRes.ok) {
+        const apptsData = await apptRes.json();
+        setAppointments(Array.isArray(apptsData) ? apptsData : apptsData.data || []);
+      }
+    } catch (err) { console.error(err); } finally { setLoading(false); }
+  };
 
   useEffect(() => {
-    if (!currentUser) {
-      navigate('/login');
-      return;
-    }
-
-    const fetchUserAndAppointments = async () => {
-      try {
-        setLoading(true);
-        setError('');
-
-        // Fetch user details from Auth Service
-        const userResponse = await fetch(`http://localhost:8083/api/auth/user/${currentUser.userId}`, {
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('healthcare_auth_token')}`,
-            'Content-Type': 'application/json',
-          },
-        });
-
-        if (userResponse.ok) {
-          const userData = await userResponse.json();
-          // Handle both direct user data and wrapped response
-          const user = userData.data || userData;
-          setUserDetails(user);
-        }
-
-        // Fetch appointments from Appointment Service
-        const appointmentsResponse = await fetch(
-          `http://localhost:8083/api/appointments?patientId=${currentUser.userId}`
-        );
-
-        if (appointmentsResponse.ok) {
-          const appointmentsData = await appointmentsResponse.json();
-          const appts = Array.isArray(appointmentsData) ? appointmentsData : appointmentsData.data || [];
-          setAppointments(appts);
-        }
-      } catch (err) {
-        console.error('Error fetching data:', err);
-        setError('Some data could not be loaded, but your profile is still available');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchUserAndAppointments();
+    if (!currentUser) { navigate('/login'); return; }
+    fetchData();
   }, [currentUser, navigate]);
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50">
-        <Navbar navigate={navigate} currentUser={currentUser} />
-        <div className="flex items-center justify-center h-96">
-          <div className="text-center">
-            <div className="text-4xl mb-4">⏳</div>
-            <p className="text-gray-600">Loading your profile...</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  const handleUpdate = async (e) => {
+    e.preventDefault();
+    const token = localStorage.getItem('healthcare_auth_token');
+    const res = await fetch(`http://localhost:8081/api/auth/user/${currentUser.userId}`, {
+      method: 'PUT',
+      headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(editForm)
+    });
 
-  if (!currentUser) {
-    return null;
-  }
+    if (res.ok) {
+      setIsEditing(false);
+      fetchData();
+    }
+  };
+
+  if (loading) return <div className="p-20 text-center">⏳ Loading...</div>;
 
   return (
     <div className="min-h-screen bg-gray-50">
       <Navbar navigate={navigate} currentUser={currentUser} />
-
-      <div className="mx-auto max-w-6xl px-4 py-12 sm:px-6 lg:px-8">
-        {error && (
-          <div className="mb-6 rounded-lg bg-red-50 p-4 border-l-4 border-red-500">
-            <p className="text-red-800">⚠️ {error}</p>
-          </div>
-        )}
-
-        {/* User Details Section */}
-        <div className="mb-12">
-          <h1 className="text-4xl font-bold text-gray-900 mb-8">👤 My Profile</h1>
-
-          <div className="bg-linear-to-r from-teal-500 to-cyan-500 rounded-2xl p-8 shadow-xl text-white mb-8">
-            <div className="flex items-center gap-6">
-              <img
-                src={`https://i.pravatar.cc/200?u=${currentUser.userId}&s=200`}
-                alt="Profile"
-                className="w-32 h-32 rounded-full border-4 border-white"
-              />
-            <div className="flex-1">
-                <h2 className="text-3xl font-bold mb-2">
-                  {userDetails?.firstName || currentUser?.name || 'User'} {userDetails?.lastName || ''}
-                </h2>
-                <p className="text-teal-100 text-lg mb-4">Patient ID: {currentUser.userId}</p>
-              </div>
+      <div className="mx-auto max-w-6xl px-4 py-12">
+        <div className="bg-gradient-to-r from-teal-500 to-cyan-500 rounded-2xl p-8 shadow-xl text-white mb-8 flex items-center justify-between">
+          <div className="flex items-center gap-6">
+            <img src={`https://i.pravatar.cc/200?u=${currentUser.userId}`} className="w-32 h-32 rounded-full border-4 border-white" alt="Profile" />
+            <div>
+              <h2 className="text-3xl font-bold">{userDetails?.firstName} {userDetails?.lastName}</h2>
+              <p className="text-teal-100">Patient ID: {currentUser.userId}</p>
             </div>
           </div>
-
-          {/* User Information Grid */}
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-            {/* Email */}
-            <div className="bg-white rounded-lg p-6 shadow-md border-l-4 border-blue-500">
-              <p className="text-gray-600 text-sm mb-1">📧 Email</p>
-              <p className="text-gray-900 font-semibold break-all">{userDetails?.email || 'N/A'}</p>
-            </div>
-
-            {/* Phone */}
-            <div className="bg-white rounded-lg p-6 shadow-md border-l-4 border-green-500">
-              <p className="text-gray-600 text-sm mb-1">📱 Phone</p>
-              <p className="text-gray-900 font-semibold">{userDetails?.phoneNumber || 'Not provided'}</p>
-            </div>
-
-            {/* Age */}
-            <div className="bg-white rounded-lg p-6 shadow-md border-l-4 border-yellow-500">
-              <p className="text-gray-600 text-sm mb-1">🎂 Age</p>
-              <p className="text-gray-900 font-semibold">{userDetails?.age || 'Not provided'}</p>
-            </div>
-
-            {/* Gender */}
-            <div className="bg-white rounded-lg p-6 shadow-md border-l-4 border-purple-500">
-              <p className="text-gray-600 text-sm mb-1">👥 Gender</p>
-              <p className="text-gray-900 font-semibold">{userDetails?.gender || 'Not provided'}</p>
-            </div>
-
-            {/* Account Status */}
-            <div className="bg-white rounded-lg p-6 shadow-md border-l-4 border-orange-500">
-              <p className="text-gray-600 text-sm mb-1">✅ Status</p>
-              <p className="text-gray-900 font-semibold">
-                {userDetails?.isActive !== false ? 'Active' : 'Inactive'}
-              </p>
-            </div>
-
-            {/* Joined Date */}
-            <div className="bg-white rounded-lg p-6 shadow-md border-l-4 border-red-500">
-              <p className="text-gray-600 text-sm mb-1">📅 Member Since</p>
-              <p className="text-gray-900 font-semibold">
-                {userDetails?.createdAt 
-                  ? new Date(userDetails.createdAt).toLocaleDateString('en-US', { 
-                      month: 'short', 
-                      day: 'numeric',
-                      year: 'numeric'
-                    })
-                  : 'April 2026'}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* Appointments Section */}
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-6">📋 My Appointments</h2>
-
-          {appointments.length === 0 ? (
-            <div className="bg-white rounded-lg p-8 shadow-md text-center">
-              <p className="text-gray-500 text-lg mb-4">No appointments booked yet</p>
-              <button
-                onClick={() => navigate('/appointment')}
-                className="bg-teal-600 text-white px-6 py-2 rounded-lg hover:bg-teal-700 transition"
-              >
-                Book an Appointment
-              </button>
-            </div>
-          ) : (
-            <div className="grid gap-6">
-              {appointments.map((appointment, index) => (
-                <div
-                  key={appointment.id || index}
-                  className="bg-white rounded-lg p-6 shadow-md border-l-4 border-teal-500 hover:shadow-lg transition"
-                >
-                  <div className="grid md:grid-cols-5 gap-4 items-start">
-                    {/* Doctor Info */}
-                    <div className="md:col-span-2">
-                      <p className="text-gray-600 text-sm mb-1">👨‍⚕️ Doctor</p>
-                      <p className="text-gray-900 font-semibold text-lg">
-                        Dr. {appointment.doctorFirstName || 'Unknown'} {appointment.doctorLastName || ''}
-                      </p>
-                    </div>
-
-                    {/* Date */}
-                    <div>
-                      <p className="text-gray-600 text-sm mb-1">📅 Date</p>
-                      <p className="text-gray-900 font-semibold">
-                        {appointment.appointmentDate
-                          ? new Date(appointment.appointmentDate).toLocaleDateString('en-US', {
-                              weekday: 'short',
-                              month: 'short',
-                              day: 'numeric',
-                            })
-                          : 'N/A'}
-                      </p>
-                    </div>
-
-                    {/* Time */}
-                    <div>
-                      <p className="text-gray-600 text-sm mb-1">⏰ Time</p>
-                      <p className="text-gray-900 font-semibold">{appointment.appointmentTime || 'N/A'}</p>
-                    </div>
-
-                    {/* Status */}
-                    <div>
-                      <p className="text-gray-600 text-sm mb-1">ℹ️ Status</p>
-                      <span className="inline-block bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-semibold capitalize">
-                        {appointment.status || 'Confirmed'}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Reason */}
-                  <div className="mt-4 pt-4 border-t border-gray-200">
-                    <p className="text-gray-600 text-sm mb-1">📝 Reason</p>
-                    <p className="text-gray-900">{appointment.reason || 'No reason provided'}</p>
-                  </div>
-
-                  {/* Token */}
-                  {appointment.token && (
-                    <div className="mt-4 bg-blue-50 rounded p-3 border-l-4 border-blue-500">
-                      <p className="text-blue-600 text-sm font-mono">
-                        🎟️ Token: <span className="font-semibold">{appointment.token}</span>
-                      </p>
-                    </div>
-                  )}
-
-                  {/* Actions */}
-                  <div className="mt-6 pt-4 border-t border-gray-200 flex gap-3">
-                    <button
-                      onClick={() => {
-                        // Reschedule action
-                        alert('Reschedule functionality coming soon!');
-                      }}
-                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-semibold text-sm"
-                    >
-                      📅 Reschedule
-                    </button>
-                    <button
-                      onClick={() => {
-                        // Cancel action
-                        if (window.confirm('Are you sure you want to cancel this appointment?')) {
-                          alert('Appointment cancelled! You will receive a confirmation email.');
-                        }
-                      }}
-                      className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition font-semibold text-sm"
-                    >
-                      ❌ Cancel
-                    </button>
-                    <button
-                      onClick={() => {
-                        // Download slip
-                        alert('Download appointment slip coming soon!');
-                      }}
-                      className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition font-semibold text-sm"
-                    >
-                      📄 Download Slip
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Edit Profile Button */}
-        <div className="mt-12 flex gap-4">
-          <button
-            onClick={() => navigate('/')}
-            className="px-6 py-3 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition font-semibold"
-          >
-            Back to Home
+          <button onClick={() => setIsEditing(!isEditing)} className="bg-white text-teal-600 px-6 py-2 rounded-xl font-bold shadow-lg">
+            {isEditing ? 'Cancel' : 'Edit Profile'}
           </button>
+        </div>
+
+        <div className="grid md:grid-cols-3 gap-8">
+          <div className="md:col-span-1 bg-white p-8 rounded-3xl shadow-md">
+            <h3 className="text-xl font-black mb-6">Personal Details</h3>
+            {isEditing ? (
+              <form onSubmit={handleUpdate} className="space-y-4">
+                <input className="w-full p-3 bg-gray-50 rounded-xl border" value={editForm.firstName || ''} onChange={e => setEditForm({...editForm, firstName: e.target.value})} placeholder="First Name" />
+                <input className="w-full p-3 bg-gray-50 rounded-xl border" value={editForm.lastName || ''} onChange={e => setEditForm({...editForm, lastName: e.target.value})} placeholder="Last Name" />
+                <input className="w-full p-3 bg-gray-50 rounded-xl border" value={editForm.phoneNumber || ''} onChange={e => setEditForm({...editForm, phoneNumber: e.target.value})} placeholder="Phone" />
+                <button type="submit" className="w-full py-3 bg-teal-600 text-white rounded-xl font-bold">Save Changes</button>
+              </form>
+            ) : (
+              <div className="space-y-4">
+                <p><strong>📧 Email:</strong> {userDetails?.email}</p>
+                <p><strong>📱 Phone:</strong> {userDetails?.phoneNumber || 'Not provided'}</p>
+                <p><strong>🎂 Age:</strong> {userDetails?.age || 'N/A'}</p>
+                <p><strong>👥 Gender:</strong> {userDetails?.gender || 'N/A'}</p>
+              </div>
+            )}
+          </div>
+
+          <div className="md:col-span-2">
+            <h2 className="text-2xl font-bold mb-6">My Appointments ({appointments.length})</h2>
+            {appointments.map((apt) => (
+              <div key={apt.id} className="bg-white p-6 rounded-2xl shadow-sm border-l-4 border-teal-500 mb-4">
+                <p className="font-bold text-lg">Dr. {apt.doctorFirstName} {apt.doctorLastName}</p>
+                <p className="text-gray-500">{apt.appointmentDate} at {apt.appointmentTime}</p>
+                <span className="text-xs bg-teal-50 text-teal-700 px-2 py-1 rounded mt-2 inline-block font-mono">{apt.token}</span>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     </div>

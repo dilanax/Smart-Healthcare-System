@@ -1,10 +1,25 @@
 package com.example.demo.controller;
 
-import com.example.demo.dto.*;
+import org.springframework.web.bind.annotation.CrossOrigin;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+import com.example.demo.dto.ApiResponseDto;
+import com.example.demo.dto.LoginRequestDto;
+import com.example.demo.dto.OtpVerifyRequestDto;
+import com.example.demo.dto.RegisterRequestDto;
+import com.example.demo.dto.UpdateUserRequestDto;
 import com.example.demo.service.AuthService;
+
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -37,25 +52,26 @@ public class AuthController {
         return authService.getAllUsers();
     }
 
-    @GetMapping("/user/{userId}")
-    public ApiResponseDto getUserById(@RequestHeader(value = "Authorization", required = false) String authorizationHeader,
-                                      @PathVariable Long userId) {
-        if (!authService.isAdminTokenValid(extractBearerToken(authorizationHeader))) {
-            return new ApiResponseDto("Unauthorized: invalid admin token", null);
-        }
-        return authService.getUserById(userId);
+   @GetMapping("/user/{userId}")
+public ApiResponseDto getUserById(@RequestHeader(value = "Authorization", required = false) String authorizationHeader,
+                                  @PathVariable Long userId) {
+    String token = extractBearerToken(authorizationHeader);
+    if (!authService.isUserAuthorized(token, userId)) {
+        return new ApiResponseDto("Unauthorized: Access denied", null);
     }
+    return authService.getUserById(userId);
+}
 
-    @PutMapping("/user/{userId}")
-    public ApiResponseDto updateUser(@RequestHeader(value = "Authorization", required = false) String authorizationHeader,
-                                     @PathVariable Long userId,
-                                     @RequestBody UpdateUserRequestDto requestDto) {
-        if (!authService.isAdminTokenValid(extractBearerToken(authorizationHeader))) {
-            return new ApiResponseDto("Unauthorized: invalid admin token", null);
-        }
-        return authService.updateUser(userId, requestDto);
+@PutMapping("/user/{userId}")
+public ApiResponseDto updateUser(@RequestHeader(value = "Authorization", required = false) String authorizationHeader,
+                                 @PathVariable Long userId,
+                                 @RequestBody UpdateUserRequestDto requestDto) {
+    String token = extractBearerToken(authorizationHeader);
+    if (!authService.isUserAuthorized(token, userId)) {
+        return new ApiResponseDto("Unauthorized: Access denied", null);
     }
-
+    return authService.updateUser(userId, requestDto);
+}
     @DeleteMapping("/user/{userId}")
     public ApiResponseDto deleteUser(@RequestHeader(value = "Authorization", required = false) String authorizationHeader,
                                      @PathVariable Long userId) {
