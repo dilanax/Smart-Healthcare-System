@@ -161,54 +161,27 @@ public class AuthServiceImpl implements AuthService, EmailService {
 
         return new ApiResponseDto("User fetched successfully", buildUserResponse(optionalUser.get()));
     }
-
-    @Override
-    public ApiResponseDto updateUser(Long userId, UpdateUserRequestDto requestDto) {
-        Optional<User> optionalUser = userRepository.findById(userId);
-
-        if (optionalUser.isEmpty()) {
-            return new ApiResponseDto("User not found", null);
-        }
-
-        User user = optionalUser.get();
-        boolean emailChanged = false;
-        String updateMessage = "User updated successfully";
-
-        if (requestDto.getEmail() != null && !requestDto.getEmail().equalsIgnoreCase(user.getEmail())) {
-            if (userRepository.existsByEmail(requestDto.getEmail())) {
-                return new ApiResponseDto("Email already exists", null);
-            }
-            user.setEmail(requestDto.getEmail());
-            user.setOtpVerified(false);
-            String otp = generateOtp();
-            user.setOtp(otp);
-            user.setOtpExpiry(LocalDateTime.now().plusMinutes(5));
-            emailChanged = true;
-            updateMessage = "User updated successfully. New email must be verified with OTP.";
-        }
-
-        if (requestDto.getFirstName() != null) user.setFirstName(requestDto.getFirstName());
-        if (requestDto.getLastName() != null) user.setLastName(requestDto.getLastName());
-        if (requestDto.getPassword() != null && !requestDto.getPassword().isBlank()) {
-            user.setPassword(passwordEncoder.encode(requestDto.getPassword()));
-        }
-        if (requestDto.getPhoneNumber() != null) user.setPhoneNumber(requestDto.getPhoneNumber());
-        if (requestDto.getRole() != null) user.setRole(requestDto.getRole());
-        if (requestDto.getActive() != null) user.setActive(requestDto.getActive());
-        
-        user.setUpdatedAt(LocalDateTime.now());
-        User updatedUser = userRepository.save(user);
-
-        if (emailChanged) {
-            try {
-                sendOtpEmail(updatedUser.getEmail(), updatedUser.getOtp());
-            } catch (Exception e) {
-                updateMessage = "User updated, but OTP email failed: " + e.getMessage();
-            }
-        }
-
-        return new ApiResponseDto(updateMessage, buildUserResponse(updatedUser));
-    }
+@Override
+public ApiResponseDto updateUser(Long userId, UpdateUserRequestDto requestDto) {
+    return userRepository.findById(userId)
+            .map(user -> {
+                // Update text fields
+                if (requestDto.getFirstName() != null) user.setFirstName(requestDto.getFirstName());
+                if (requestDto.getLastName() != null) user.setLastName(requestDto.getLastName());
+                if (requestDto.getPhoneNumber() != null) user.setPhoneNumber(requestDto.getPhoneNumber());
+                if (requestDto.getAge() != null) user.setAge((Integer) requestDto.getAge());
+                if (requestDto.getGender() != null) user.setGender(requestDto.getGender());
+                
+                // Update the image reference
+                if (requestDto.getProfilePictureUrl() != null) {
+                    user.setProfilePictureUrl((String) requestDto.getProfilePictureUrl());
+                }
+                
+                userRepository.save(user);
+                return new ApiResponseDto("Profile successfully synchronized", buildUserResponse(user));
+            })
+            .orElse(new ApiResponseDto("User record missing", null));
+}
 
     @Override
     public ApiResponseDto deleteUser(Long userId) {
@@ -239,14 +212,32 @@ public class AuthServiceImpl implements AuthService, EmailService {
 
     @Override
     public boolean isUserAuthorized(String token, Long requestedUserId) {
-        if (token == null || token.isBlank()) return false;
+        if (token == null || token.isBlank() || token.equals("null")) {
+            System.out.println("Auth Error: Token is null or empty");
+            return false;
+        }
+        
         if (isAdminTokenValid(token)) return true;
 
         try {
             Map<String, Object> claims = getClaimsFromToken(token);
             Object idFromToken = claims.get("id");
-            return idFromToken != null && Long.valueOf(String.valueOf(idFromToken)).equals(requestedUserId);
+            
+            if (idFromToken == null) {
+                System.out.println("Auth Error: Token does not contain an 'id' claim. User needs to log in again.");
+                return false;
+            }
+            
+            Long tokenId = Long.parseLong(String.valueOf(idFromToken));
+            boolean isMatch = tokenId.equals(requestedUserId);
+            
+            if (!isMatch) {
+                System.out.println("Auth Error: Token ID (" + tokenId + ") does not match requested ID (" + requestedUserId + ")");
+            }
+            
+            return isMatch;
         } catch (Exception e) {
+            System.out.println("Auth Error during token parsing: " + e.getMessage());
             return false;
         }
     }
@@ -272,22 +263,23 @@ public class AuthServiceImpl implements AuthService, EmailService {
         return String.valueOf(100000 + new Random().nextInt(900000));
     }
 
-    private String generateAdminToken(User user) {
+    // 1. Rename generateAdminToken to generateJwtToken and use it for everyone
+    private String generateJwtToken(User user) {
         try {
             long now = LocalDateTime.now().toEpochSecond(ZoneOffset.UTC);
             long exp = LocalDateTime.now().plusHours(jwtExpirationHours).toEpochSecond(ZoneOffset.UTC);
-
+            
             Map<String, Object> header = new LinkedHashMap<>();
             header.put("alg", "HS256");
             header.put("typ", "JWT");
-
+            
             Map<String, Object> payload = new LinkedHashMap<>();
             payload.put("id", user.getId());
             payload.put("email", user.getEmail());
-            payload.put("role", user.getRole().name());
+            payload.put("role", user.getRole().name()); // Role is safely embedded here!
             payload.put("iat", now);
             payload.put("exp", exp);
-
+            
             String h = Base64.getUrlEncoder().withoutPadding().encodeToString(objectMapper.writeValueAsBytes(header));
             String p = Base64.getUrlEncoder().withoutPadding().encodeToString(objectMapper.writeValueAsBytes(payload));
             return h + "." + p + "." + sign(h + "." + p);
@@ -296,23 +288,24 @@ public class AuthServiceImpl implements AuthService, EmailService {
         }
     }
 
-    private String sign(String content) throws Exception {
-        Mac sha256Hmac = Mac.getInstance("HmacSHA256");
-        sha256Hmac.init(new SecretKeySpec(jwtSecret.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
-        return Base64.getUrlEncoder().withoutPadding().encodeToString(sha256Hmac.doFinal(content.getBytes(StandardCharsets.UTF_8)));
-    }
-
+    // 2. Give the token to ALL users, not just Admins!
     private Map<String, Object> buildLoginResponse(User user) {
         Map<String, Object> data = new HashMap<>();
         data.put("userId", user.getId());
         data.put("email", user.getEmail());
         data.put("role", user.getRole());
         data.put("name", user.getFirstName() + " " + user.getLastName());
-        if (user.getRole() == Role.ADMIN) {
-            data.put("accessToken", generateAdminToken(user));
-            data.put("tokenType", "Bearer");
-        }
+        
+        // FIXED: Everyone gets an access token so they can access their own data
+        data.put("accessToken", generateJwtToken(user));
+        data.put("tokenType", "Bearer");
+        
         return data;
+    }
+    private String sign(String content) throws Exception {
+        Mac sha256Hmac = Mac.getInstance("HmacSHA256");
+        sha256Hmac.init(new SecretKeySpec(jwtSecret.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
+        return Base64.getUrlEncoder().withoutPadding().encodeToString(sha256Hmac.doFinal(content.getBytes(StandardCharsets.UTF_8)));
     }
 
     private Map<String, Object> buildUserResponse(User user) {

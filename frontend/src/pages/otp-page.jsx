@@ -81,7 +81,7 @@ const OtpPage = ({ navigate, refreshUser }) => {
 
       if (response?.message?.toLowerCase().includes('otp sent')) {
         setSuccess('OTP resent to your email successfully.');
-        setResendTimer(30); // 30 seconds cooldown
+        setResendTimer(30); 
         setOtp('');
         setOtpError('');
         setTouched(false);
@@ -94,31 +94,6 @@ const OtpPage = ({ navigate, refreshUser }) => {
       setResendLoading(false);
     }
   };
-
-  const handleVerifyOtp = async (otpCode) => {
-    try {
-        const response = await API.post('/auth/verify-otp', {
-            email: location.state.email,
-            otp: otpCode
-        });
-
-        // Save the long JWT 'accessToken' you enabled in the service
-        const { accessToken, role, userId } = response.data.data;
-        localStorage.setItem('accessToken', accessToken);
-        localStorage.setItem('userRole', role);
-
-        toast.success("Login Successful!");
-
-        // Redirect based on role (Patient vs Admin)
-        if (role === 'ADMIN') {
-            navigate('/admin-dashboard');
-        } else {
-            navigate('/profile');
-        }
-    } catch (err) {
-        console.error("Verification failed", err);
-    }
-};
 
   const handleSubmit = async (event) => {
     event.preventDefault();
@@ -147,7 +122,8 @@ const OtpPage = ({ navigate, refreshUser }) => {
         otp,
       });
 
-      const userData = verifyResponse?.data;
+      // Extract data from response (handles both direct objects and nested ApiResponseDto data)
+      const userData = verifyResponse?.data || verifyResponse;
 
       if (!userData || !userData.userId) {
         setError('OTP verification failed. Please try again.');
@@ -155,14 +131,21 @@ const OtpPage = ({ navigate, refreshUser }) => {
         return;
       }
 
+      // 🚨 CRITICAL FIX: Explicitly save the token to localStorage right here 🚨
+      if (userData.accessToken) {
+        localStorage.setItem('healthcare_auth_token', userData.accessToken);
+      }
+
       storeUser(userData);
       clearPendingAuth();
       refreshUser();
       setSuccess('OTP verified successfully. Logging you in...');
       
+      // Auto-navigate to profile instead of home page so you can see it work!
       setTimeout(() => {
-        navigate(userData.role === 'ADMIN' ? '/admin' : '/');
+        navigate(userData.role === 'ADMIN' ? '/admin' : '/profile');
       }, 1500);
+
     } catch (submitError) {
       setError(submitError.message || 'Invalid OTP. Please try again.');
     } finally {

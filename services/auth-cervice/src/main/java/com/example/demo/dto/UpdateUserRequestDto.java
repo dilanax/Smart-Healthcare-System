@@ -25,4 +25,9 @@ public class UpdateUserRequestDto {
     public String getEmail() {
         throw new UnsupportedOperationException("Not supported yet.");
     }
+
+
+    public String getProfilePictureUrl() {
+        throw new UnsupportedOperationException("Not supported yet.");
+    }
 }

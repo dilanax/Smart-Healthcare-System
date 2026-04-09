@@ -46,37 +46,43 @@ public class AuthController {
 
     @GetMapping("/users")
     public ApiResponseDto getAllUsers(@RequestHeader(value = "Authorization", required = false) String authorizationHeader) {
+        // Only Admins can get ALL users
         if (!authService.isAdminTokenValid(extractBearerToken(authorizationHeader))) {
             return new ApiResponseDto("Unauthorized: invalid admin token", null);
         }
         return authService.getAllUsers();
     }
 
-   @GetMapping("/user/{userId}")
-public ApiResponseDto getUserById(@RequestHeader(value = "Authorization", required = false) String authorizationHeader,
-                                  @PathVariable Long userId) {
-    String token = extractBearerToken(authorizationHeader);
-    if (!authService.isUserAuthorized(token, userId)) {
-        return new ApiResponseDto("Unauthorized: Access denied", null);
+    @GetMapping("/user/{userId}")
+    public ApiResponseDto getUserById(@RequestHeader(value = "Authorization", required = false) String authorizationHeader,
+                                      @PathVariable Long userId) {
+        String token = extractBearerToken(authorizationHeader);
+        // FIXED: Allow the user to view their own profile
+        if (!authService.isUserAuthorized(token, userId)) {
+            return new ApiResponseDto("Unauthorized: Access denied", null);
+        }
+        return authService.getUserById(userId);
     }
-    return authService.getUserById(userId);
-}
 
-@PutMapping("/user/{userId}")
-public ApiResponseDto updateUser(@RequestHeader(value = "Authorization", required = false) String authorizationHeader,
-                                 @PathVariable Long userId,
-                                 @RequestBody UpdateUserRequestDto requestDto) {
-    String token = extractBearerToken(authorizationHeader);
-    if (!authService.isUserAuthorized(token, userId)) {
-        return new ApiResponseDto("Unauthorized: Access denied", null);
+    @PutMapping("/user/{userId}")
+    public ApiResponseDto updateUser(@RequestHeader(value = "Authorization", required = false) String authorizationHeader,
+                                     @PathVariable Long userId,
+                                     @RequestBody UpdateUserRequestDto requestDto) {
+        String token = extractBearerToken(authorizationHeader);
+        // FIXED: Allow the user to update their own profile
+        if (!authService.isUserAuthorized(token, userId)) {
+            return new ApiResponseDto("Unauthorized: Access denied", null);
+        }
+        return authService.updateUser(userId, requestDto);
     }
-    return authService.updateUser(userId, requestDto);
-}
+
     @DeleteMapping("/user/{userId}")
     public ApiResponseDto deleteUser(@RequestHeader(value = "Authorization", required = false) String authorizationHeader,
                                      @PathVariable Long userId) {
-        if (!authService.isAdminTokenValid(extractBearerToken(authorizationHeader))) {
-            return new ApiResponseDto("Unauthorized: invalid admin token", null);
+        String token = extractBearerToken(authorizationHeader);
+        // FIXED: Allow the user to delete their own profile
+        if (!authService.isUserAuthorized(token, userId)) {
+            return new ApiResponseDto("Unauthorized: Access denied", null);
         }
         return authService.deleteUser(userId);
     }
