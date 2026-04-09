@@ -54,6 +54,19 @@ const LoginPage = ({ navigate, refreshUser }) => {
     }
   };
 
+  const handleLogin = async (credentials) => {
+    try {
+        const response = await API.post('/auth/login', credentials);
+        // Your backend returns: "OTP sent to your email..."
+        if (response.data.message.includes("OTP sent")) {
+            // Navigate to the OTP page and pass the email
+            navigate('/otp', { state: { email: credentials.email } });
+        }
+    } catch (err) {
+        console.error("Login failed", err);
+    }
+};
+
   const handleBlur = (event) => {
     const { name, value } = event.target;
     setTouched((prev) => ({ ...prev, [name]: true }));
