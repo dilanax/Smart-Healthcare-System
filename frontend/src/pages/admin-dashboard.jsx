@@ -122,7 +122,7 @@ const AdminDashboard = ({ navigate, currentUser, refreshUser }) => {
     setError('');
 
     try {
-      const response = await fetch('http://localhost:8085/api/appointments');
+      const response = await fetch('http://localhost:8083/api/appointments');
       if (response.ok) {
         const data = await response.json();
         setAppointments(Array.isArray(data) ? data : data.data || []);
@@ -143,7 +143,7 @@ const AdminDashboard = ({ navigate, currentUser, refreshUser }) => {
     setSuccess('');
 
     try {
-      const response = await fetch(`http://localhost:8085/api/appointments/${appointmentId}`, {
+      const response = await fetch(`http://localhost:8083/api/appointments/${appointmentId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: 'CONFIRMED' })
@@ -173,7 +173,7 @@ const AdminDashboard = ({ navigate, currentUser, refreshUser }) => {
     setSuccess('');
 
     try {
-      const response = await fetch(`http://localhost:8085/api/appointments/${appointmentId}`, {
+      const response = await fetch(`http://localhost:8083/api/appointments/${appointmentId}`, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' }
       });
@@ -224,7 +224,7 @@ const AdminDashboard = ({ navigate, currentUser, refreshUser }) => {
     setSuccess('');
 
     try {
-      const response = await fetch(`http://localhost:8085/api/appointments/${selectedAppointment.appointmentId}`, {
+      const response = await fetch(`http://localhost:8083/api/appointments/${selectedAppointment.appointmentId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(editAppointmentForm)
