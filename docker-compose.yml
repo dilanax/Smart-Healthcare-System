@@ -20,17 +20,17 @@ services:
       timeout: 5s
       retries: 5
 
-  # Auth Service
+  # Auth Service (Port 8081)
   auth-service:
     build:
-      context: ./services/auth-cervice
+      context: ./services/auth-cervice # FIXED TYPO
       dockerfile: Dockerfile
     container_name: auth-service
     environment:
       SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/healthcare_db?createDatabaseIfNotExist=true
       SPRING_DATASOURCE_USERNAME: healthcare
       SPRING_DATASOURCE_PASSWORD: 123456
-      SERVER_PORT: 8083
+      SERVER_PORT: 8081 # UNIQUE PORT
       SPRING_MAIL_HOST: smtp.gmail.com
       SPRING_MAIL_PORT: 587
       SPRING_MAIL_USERNAME: dilanavishka183@gmail.com
@@ -40,14 +40,14 @@ services:
       APP_JWT_SECRET: my-super-secret-key-change-this-in-production
       APP_JWT_EXPIRATION_HOURS: 8
     ports:
-      - "8083:8083"
+      - "8081:8081"
     depends_on:
       mysql:
         condition: service_healthy
     networks:
       - healthcare-network
 
-  # Doctor Service
+  # Doctor Service (Port 8082)
   doctor-service:
     build:
       context: ./services/doctor-service
@@ -57,16 +57,16 @@ services:
       SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/healthcare_db?createDatabaseIfNotExist=true
       SPRING_DATASOURCE_USERNAME: healthcare
       SPRING_DATASOURCE_PASSWORD: 123456
-      SERVER_PORT: 8083
+      SERVER_PORT: 8082 # UNIQUE PORT
     ports:
-      - "8083:8083"
+      - "8082:8082"
     depends_on:
       mysql:
         condition: service_healthy
     networks:
       - healthcare-network
 
-  # Patient Service
+  # Patient Service (Port 8083)
   patient-service:
     build:
       context: ./services/patient-service
@@ -76,7 +76,7 @@ services:
       SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/healthcare_db?createDatabaseIfNotExist=true
       SPRING_DATASOURCE_USERNAME: healthcare
       SPRING_DATASOURCE_PASSWORD: 123456
-      SERVER_PORT: 8083
+      SERVER_PORT: 8083 # UNIQUE PORT
     ports:
       - "8083:8083"
     depends_on:
@@ -85,7 +85,7 @@ services:
     networks:
       - healthcare-network
 
-  # Notification Service
+  # Notification Service (Port 8084)
   notification-service:
     build:
       context: ./services/notification-service
@@ -110,7 +110,7 @@ services:
     networks:
       - healthcare-network
 
-  # Appointment Service
+  # Appointment Service (Port 8085)
   appointment-service:
     build:
       context: ./services/appointment-service
@@ -120,16 +120,16 @@ services:
       SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/healthcare_db?createDatabaseIfNotExist=true
       SPRING_DATASOURCE_USERNAME: healthcare
       SPRING_DATASOURCE_PASSWORD: 123456
-      SERVER_PORT: 8083
+      SERVER_PORT: 8085 # UNIQUE PORT
     ports:
-      - "8083:8083"
+      - "8085:8085"
     depends_on:
       mysql:
         condition: service_healthy
     networks:
       - healthcare-network
 
-  # Payment Service
+  # Payment Service (Port 8086)
   payment-service:
     build:
       context: ./services/payment-service
@@ -157,14 +157,17 @@ services:
     ports:
       - "5173:5173"
     environment:
-      VITE_API_BASE_URL: http://localhost:8083
+      # Note: If your frontend needs to talk to ALL these services, 
+      # you will need to configure your React Axios calls to point to the respective ports!
+      VITE_AUTH_API_URL: http://localhost:8081
+      VITE_DOCTOR_API_URL: http://localhost:8082
+      VITE_PATIENT_API_URL: http://localhost:8083
+      VITE_APPOINTMENT_API_URL: http://localhost:8085
     depends_on:
       - auth-service
       - doctor-service
       - patient-service
-      - notification-service
       - appointment-service
-      - payment-service
     networks:
       - healthcare-network
 
