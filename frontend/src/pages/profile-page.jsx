@@ -19,7 +19,7 @@ const ProfilePage = ({ navigate, currentUser }) => {
         setError('');
 
         // Fetch user details from Auth Service
-        const userResponse = await fetch(`http://localhost:8081/api/auth/user/${currentUser.userId}`, {
+        const userResponse = await fetch(`http://localhost:8083/api/auth/user/${currentUser.userId}`, {
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('healthcare_auth_token')}`,
             'Content-Type': 'application/json',
@@ -35,7 +35,7 @@ const ProfilePage = ({ navigate, currentUser }) => {
 
         // Fetch appointments from Appointment Service
         const appointmentsResponse = await fetch(
-          `http://localhost:8085/api/appointments?patientId=${currentUser.userId}`
+          `http://localhost:8083/api/appointments?patientId=${currentUser.userId}`
         );
 
         if (appointmentsResponse.ok) {
