@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { deleteUser, fetchUserById, fetchUsers, registerUser, updateUser } from '../lib/auth';
+import { deleteNotificationById, fetchNotificationSummary, fetchNotifications, sendNotificationById, updateNotificationStatus } from '../lib/notifications';
 
 const menu = [
   ['overview', 'fas fa-chart-line', 'Dashboard Overview'],
   ['users', 'fas fa-users', 'User Management'],
   ['doctors', 'fas fa-user-md', 'Doctor Verification'],
   ['appointments', 'fas fa-calendar-check', 'Appointments'],
+  ['notifications', 'fas fa-bell', 'Notification Management'],
   ['payments', 'fas fa-credit-card', 'Transactions'],
   ['reports', 'fas fa-file-alt', 'Reports'],
   ['settings', 'fas fa-cog', 'Settings'],
@@ -92,6 +94,8 @@ const AdminDashboard = ({ navigate, currentUser, refreshUser }) => {
   const [editAppointmentForm, setEditAppointmentForm] = useState({});
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [payments, setPayments] = useState([]);
+  const [notifications, setNotifications] = useState([]);
+  const [notificationSummary, setNotificationSummary] = useState(null);
 
   const accessToken = currentUser?.accessToken;
 
@@ -204,6 +208,76 @@ const approvePayment = async (paymentId) => {
     alert("Failed to approve payment");
   }
 };
+
+  const loadNotifications = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
+    setError('');
+
+    try {
+      const [listResponse, summaryResponse] = await Promise.all([
+        fetchNotifications(),
+        fetchNotificationSummary(),
+      ]);
+      setNotifications(Array.isArray(listResponse?.data) ? listResponse.data : []);
+      setNotificationSummary(summaryResponse?.data || null);
+    } catch (err) {
+      setError(err.message || 'Failed to load notifications.');
+    } finally {
+      if (!silent) setLoading(false);
+    }
+  }, []);
+
+  const triggerSendNotification = async (notificationId) => {
+    setBusyId(notificationId);
+    setError('');
+    setSuccess('');
+    try {
+      const response = await sendNotificationById(notificationId);
+      const updated = response?.data;
+      setNotifications((prev) => prev.map((item) => item.id === notificationId ? updated : item));
+      setSuccess(response?.message || 'Notification sent successfully.');
+      await loadNotifications(true);
+    } catch (err) {
+      setError(err.message || 'Failed to send notification.');
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const changeNotificationStatus = async (notificationId, status) => {
+    setBusyId(notificationId);
+    setError('');
+    setSuccess('');
+    try {
+      const response = await updateNotificationStatus(notificationId, status);
+      const updated = response?.data;
+      setNotifications((prev) => prev.map((item) => item.id === notificationId ? updated : item));
+      setSuccess(response?.message || 'Notification status updated.');
+      await loadNotifications(true);
+    } catch (err) {
+      setError(err.message || 'Failed to update notification status.');
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const removeNotification = async (notificationId) => {
+    if (!window.confirm('Delete this notification permanently?')) return;
+
+    setBusyId(notificationId);
+    setError('');
+    setSuccess('');
+    try {
+      await deleteNotificationById(notificationId);
+      setNotifications((prev) => prev.filter((item) => item.id !== notificationId));
+      setSuccess('Notification deleted successfully.');
+      await loadNotifications(true);
+    } catch (err) {
+      setError(err.message || 'Failed to delete notification.');
+    } finally {
+      setBusyId(null);
+    }
+  };
 
 
 
@@ -345,7 +419,8 @@ const approvePayment = async (paymentId) => {
     loadUsers();
     loadAppointments();
     loadPayments();
-  }, [accessToken, currentUser, loadUsers, loadAppointments, navigate]);
+    loadNotifications(true);
+  }, [accessToken, currentUser, loadUsers, loadAppointments, loadPayments, loadNotifications, navigate]);
 
   const filteredUsers = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -894,6 +969,103 @@ const approvePayment = async (paymentId) => {
              </div>
             </div>
            ) : null}
+
+            {!loading && activeTab === 'notifications' ? (
+              <div className="rounded-2xl bg-white shadow-lg">
+                <div className="flex flex-col gap-4 border-b border-gray-200 px-6 py-4 md:flex-row md:items-center md:justify-between">
+                  <div>
+                    <h3 className="text-lg font-bold text-gray-800">Notification Management</h3>
+                    <p className="mt-1 text-sm text-gray-500">Only admins can manage notification delivery and status updates.</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => loadNotifications()}
+                    className="rounded-lg bg-teal-600 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-700"
+                  >
+                    Refresh Notifications
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 gap-4 border-b border-gray-100 p-6 md:grid-cols-5">
+                  <div className="rounded-xl bg-slate-50 p-4"><p className="text-xs text-gray-500">Total</p><p className="mt-1 text-xl font-bold text-gray-800">{notificationSummary?.totalNotifications ?? notifications.length}</p></div>
+                  <div className="rounded-xl bg-yellow-50 p-4"><p className="text-xs text-gray-500">Queued</p><p className="mt-1 text-xl font-bold text-yellow-700">{notificationSummary?.queuedNotifications ?? 0}</p></div>
+                  <div className="rounded-xl bg-green-50 p-4"><p className="text-xs text-gray-500">Sent</p><p className="mt-1 text-xl font-bold text-green-700">{notificationSummary?.sentNotifications ?? 0}</p></div>
+                  <div className="rounded-xl bg-rose-50 p-4"><p className="text-xs text-gray-500">Failed</p><p className="mt-1 text-xl font-bold text-rose-700">{notificationSummary?.failedNotifications ?? 0}</p></div>
+                  <div className="rounded-xl bg-red-50 p-4"><p className="text-xs text-gray-500">Critical</p><p className="mt-1 text-xl font-bold text-red-700">{notificationSummary?.criticalNotifications ?? 0}</p></div>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">ID</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">Recipient</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">Subject</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">Channel</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">Status</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200">
+                      {notifications.length === 0 ? (
+                        <tr><td colSpan="6" className="px-6 py-8 text-center text-sm text-gray-500">No notifications found.</td></tr>
+                      ) : notifications.map((item) => (
+                        <tr key={item.id} className="hover:bg-gray-50">
+                          <td className="px-6 py-4 text-sm font-semibold text-gray-800">#{item.id}</td>
+                          <td className="px-6 py-4 text-sm text-gray-600">
+                            <p>{item.recipientName || 'Unknown'}</p>
+                            <p className="text-xs text-gray-500">{item.recipientEmail || item.recipientPhone || 'No contact'}</p>
+                          </td>
+                          <td className="px-6 py-4 text-sm text-gray-700">{item.subject || 'No subject'}</td>
+                          <td className="px-6 py-4 text-xs font-semibold text-teal-700">{item.channel || 'N/A'}</td>
+                          <td className="px-6 py-4">
+                            <span className={`rounded-full px-3 py-1 text-xs font-medium ${item.status === 'SENT' ? 'bg-green-100 text-green-700' : item.status === 'FAILED' ? 'bg-rose-100 text-rose-700' : 'bg-yellow-100 text-yellow-700'}`}>
+                              {item.status || 'QUEUED'}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="flex flex-wrap gap-2">
+                              <button
+                                type="button"
+                                onClick={() => triggerSendNotification(item.id)}
+                                disabled={busyId === item.id}
+                                className="rounded-md bg-blue-100 px-3 py-1 text-xs font-semibold text-blue-700 hover:bg-blue-200 disabled:opacity-50"
+                              >
+                                Send
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => changeNotificationStatus(item.id, 'QUEUED')}
+                                disabled={busyId === item.id}
+                                className="rounded-md bg-yellow-100 px-3 py-1 text-xs font-semibold text-yellow-700 hover:bg-yellow-200 disabled:opacity-50"
+                              >
+                                Mark Queued
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => changeNotificationStatus(item.id, 'FAILED')}
+                                disabled={busyId === item.id}
+                                className="rounded-md bg-rose-100 px-3 py-1 text-xs font-semibold text-rose-700 hover:bg-rose-200 disabled:opacity-50"
+                              >
+                                Mark Failed
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => removeNotification(item.id)}
+                                disabled={busyId === item.id}
+                                className="rounded-md bg-red-100 px-3 py-1 text-xs font-semibold text-red-700 hover:bg-red-200 disabled:opacity-50"
+                              >
+                                Delete
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ) : null}
 
 
             {!loading && activeTab === 'reports' ? <Placeholder title="Reports module pending" text="There is no reports endpoint in the current backend, so this section stays as a placeholder." /> : null}

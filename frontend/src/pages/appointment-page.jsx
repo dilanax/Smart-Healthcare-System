@@ -298,6 +298,11 @@ const AppointmentPage = ({ navigate, currentUser }) => {
         JSON.stringify({
           appointmentId: appointmentId,
           doctor: `${selectedDoctor.firstName} ${selectedDoctor.lastName}`,
+          doctorEmail: selectedDoctor.email || `doctor${selectedDoctor.userId}@healthcare.local`,
+          doctorPhone: selectedDoctor.phone || selectedDoctor.phoneNumber || '+94000000000',
+          patientName: userDetails.name,
+          patientEmail: userDetails.email,
+          patientPhone: userDetails.phone,
           date: appointmentDate,
           time: selectedTime,
           amount: selectedDoctor.consultationFee || 2500

@@ -2,7 +2,9 @@ import { useEffect, useState } from "react";
 import Navbar from "../components/navbar";
 
 const PAYMENT_API_BASE_URL =
-  import.meta.env.VITE_PAYMENT_API_BASE_URL?.trim() || "http://localhost:8086";
+  import.meta.env.VITE_PAYMENT_API_BASE_URL?.trim() || "http://localhost:8096";
+const NOTIFICATION_API_BASE_URL =
+  import.meta.env.VITE_NOTIFICATION_API_BASE_URL?.trim() || "http://localhost:8094";
 const PAYHERE_SDK_URL = "https://www.payhere.lk/lib/payhere.js";
 
 const loadPayHereSdk = () => {
@@ -67,6 +69,35 @@ const PaymentPage = ({ navigate }) => {
 
   if (!payment) return null;
 
+  const triggerAppointmentNotification = async (paymentMethod) => {
+    const payload = {
+      eventType: "APPOINTMENT_BOOKED",
+      appointmentId: Number(payment.appointmentId),
+      eventTime: new Date().toISOString(),
+      details: `Appointment confirmed via ${paymentMethod}. Date: ${payment.date} ${payment.time}`,
+      patient: {
+        name: payment.patientName || "Patient",
+        email: payment.patientEmail || "patient@healthcare.local",
+        phone: payment.patientPhone || "+94000000001",
+      },
+      doctor: {
+        name: payment.doctor || "Doctor",
+        email: payment.doctorEmail || "doctor@healthcare.local",
+        phone: payment.doctorPhone || "+94000000000",
+      },
+    };
+
+    try {
+      await fetch(`${NOTIFICATION_API_BASE_URL}/api/notifications/events/appointment-success`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+    } catch (error) {
+      console.error("Notification trigger failed:", error);
+    }
+  };
+
   const handleSuccessfulPayment = () => {
     localStorage.removeItem("paymentInfo");
     navigate("/");
@@ -110,8 +141,9 @@ const PaymentPage = ({ navigate }) => {
         throw new Error("Payment hash was empty.");
       }
 
-      payhere.onCompleted = () => {
+      payhere.onCompleted = async () => {
         setLoading(false);
+        await triggerAppointmentNotification("PAYHERE");
         setPaymentNotice("Payment completed successfully.");
         handleSuccessfulPayment();
       };
@@ -185,6 +217,7 @@ const PaymentPage = ({ navigate }) => {
         throw new Error(errorText || "Failed to register cash payment.");
       }
 
+      await triggerAppointmentNotification("CASH");
       localStorage.removeItem("paymentInfo");
       setPaymentNotice("Appointment booked. Please pay cash at the hospital.");
       navigate("/");
