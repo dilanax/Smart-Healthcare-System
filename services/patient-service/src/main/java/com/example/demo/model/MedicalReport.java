@@ -2,6 +2,8 @@ package com.example.demo.model;
 
 import java.time.LocalDateTime;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -18,27 +20,28 @@ public class MedicalReport {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    // Links this report to a specific patient profile
     @Column(nullable = false)
     private Long patientId;
 
     private String fileName;
     private String fileType;
+    private String description; 
 
-    // @Lob tells Spring Boot to store this as a large binary file in MySQL
     @Lob
     @Column(columnDefinition = "LONGBLOB")
     private byte[] data;
 
-    private LocalDateTime uploadDate;
+    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd HH:mm:ss")
+    private java.time.LocalDateTime uploadDate;
 
     public MedicalReport() {
     }
 
-    public MedicalReport(Long patientId, String fileName, String fileType, byte[] data) {
+    public MedicalReport(Long patientId, String fileName, String fileType, String description, byte[] data) {
         this.patientId = patientId;
         this.fileName = fileName;
         this.fileType = fileType;
+        this.description = description;
         this.data = data;
         this.uploadDate = LocalDateTime.now();
     }
@@ -55,6 +58,9 @@ public class MedicalReport {
 
     public String getFileType() { return fileType; }
     public void setFileType(String fileType) { this.fileType = fileType; }
+    
+    public String getDescription() { return description; }
+    public void setDescription(String description) { this.description = description; }
 
     public byte[] getData() { return data; }
     public void setData(byte[] data) { this.data = data; }
