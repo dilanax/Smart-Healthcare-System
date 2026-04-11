@@ -7,7 +7,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -16,46 +15,51 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
+import com.example.demo.dto.ApiResponseDto;
 import com.example.demo.model.MedicalReport;
 import com.example.demo.service.MedicalReportService;
 
 @RestController
-@RequestMapping("/api/patients")
-@CrossOrigin(origins = "*")
+@RequestMapping("/api/reports") 
+// 🚨 @CrossOrigin REMOVED intentionally to prevent double-header conflicts! 🚨
 public class MedicalReportController {
 
     @Autowired
     private MedicalReportService reportService;
 
     // 1. Upload a new medical report
-    @PostMapping("/{patientId}/reports")
-    public ResponseEntity<?> uploadReport(
+    @PostMapping("/upload/{patientId}")
+    public ApiResponseDto uploadReport(
             @PathVariable Long patientId, 
-            @RequestParam("file") MultipartFile file) {
+            @RequestParam("file") MultipartFile file,
+            @RequestParam(value = "description", required = false) String description) {
         try {
-            MedicalReport savedReport = reportService.storeFile(patientId, file);
-            return ResponseEntity.ok("File uploaded successfully! ID: " + savedReport.getId() + ", Name: " + savedReport.getFileName());
+            MedicalReport savedReport = reportService.storeFile(patientId, file, description);
+            // Must nullify the byte array before sending JSON back, or the browser will crash
+            savedReport.setData(null); 
+            return new ApiResponseDto("File uploaded successfully", savedReport);
         } catch (IOException e) {
-            return ResponseEntity.badRequest().body("Could not upload the file: " + e.getMessage());
+            return new ApiResponseDto("Could not upload the file: " + e.getMessage(), null);
         }
     }
 
     // 2. Get a list of all reports for a specific patient
-    @GetMapping("/{patientId}/reports")
-    public ResponseEntity<List<MedicalReport>> getAllPatientReports(@PathVariable Long patientId) {
+    @GetMapping("/patient/{patientId}")
+    public ApiResponseDto getAllPatientReports(@PathVariable Long patientId) {
         List<MedicalReport> reports = reportService.getAllReportsForPatient(patientId);
-        return ResponseEntity.ok(reports);
+        // Hide the heavy byte array from the list view to make it load instantly
+        reports.forEach(report -> report.setData(null)); 
+        return new ApiResponseDto("Reports fetched", reports);
     }
 
     // 3. Download or view a specific report
-    @GetMapping("/reports/download/{fileId}")
+    @GetMapping("/download/{fileId}")
     public ResponseEntity<byte[]> downloadReport(@PathVariable Long fileId) {
         try {
             MedicalReport report = reportService.getFile(fileId);
 
-            // This tells the browser to download the file with its original name and type
             return ResponseEntity.ok()
-                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + report.getFileName() + "\"")
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + report.getFileName() + "\"")
                     .contentType(MediaType.parseMediaType(report.getFileType()))
                     .body(report.getData());
         } catch (RuntimeException e) {
