@@ -76,7 +76,13 @@ services:
       SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/healthcare_db?createDatabaseIfNotExist=true
       SPRING_DATASOURCE_USERNAME: healthcare
       SPRING_DATASOURCE_PASSWORD: 123456
-      SERVER_PORT: 8083 # UNIQUE PORT
+      SERVER_PORT: 8083
+      SPRING_SERVLET_MULTIPART_MAX_FILE_SIZE: 10MB
+      SPRING_SERVLET_MULTIPART_MAX_REQUEST_SIZE: 15MB
+      
+      # 🚨 ADD THIS LINE! This lets the patient-service read the tokens! 🚨
+      APP_JWT_SECRET: my-super-secret-key-change-this-in-production
+      
     ports:
       - "8083:8083"
     depends_on:
