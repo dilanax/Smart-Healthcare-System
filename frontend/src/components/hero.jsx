@@ -47,11 +47,11 @@ const services = [
   { icon: "🔬", title: "Lab Diagnostics", desc: "Fast and accurate diagnostics", patients: "25,000+", doctors: "12+", color: "#805ad5" },
 ];
 
-const doctors = [
-  { name: "Dr. Sarah Johnson", specialty: "Cardiologist", img: "https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=400&q=80", rating: 4.9, experience: "15 yrs", patients: "5,200+", availability: "Available Today" },
-  { name: "Dr. Michael Chen", specialty: "Neurologist", img: "https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?w=400&q=80", rating: 4.8, experience: "12 yrs", patients: "3,800+", availability: "Available Tomorrow" },
-  { name: "Dr. Emily Rodriguez", specialty: "Pediatrician", img: "https://images.unsplash.com/photo-1594824476967-48c8b964273f?w=400&q=80", rating: 5.0, experience: "10 yrs", patients: "4,500+", availability: "Available Today" },
-  { name: "Dr. James Wilson", specialty: "Orthopedic Surgeon", img: "https://images.unsplash.com/photo-1622253692010-333f2da6031d?w=400&q=80", rating: 4.9, experience: "18 yrs", patients: "6,100+", availability: "Available Today" },
+const fallbackDoctors = [
+  { userId: 1, firstName: "Sarah", lastName: "Johnson", specialty: "Cardiologist", imageUrl: "https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=400&q=80", rating: 4.9, experienceYears: 15, patientCount: 5200, availability: "Available Today" },
+  { userId: 2, firstName: "Michael", lastName: "Chen", specialty: "Neurologist", imageUrl: "https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?w=400&q=80", rating: 4.8, experienceYears: 12, patientCount: 3800, availability: "Available Tomorrow" },
+  { userId: 3, firstName: "Emily", lastName: "Rodriguez", specialty: "Pediatrician", imageUrl: "https://images.unsplash.com/photo-1594824476967-48c8b964273f?w=400&q=80", rating: 5.0, experienceYears: 10, patientCount: 4500, availability: "Available Today" },
+  { userId: 4, firstName: "James", lastName: "Wilson", specialty: "Orthopedic Surgeon", imageUrl: "https://images.unsplash.com/photo-1622253692010-333f2da6031d?w=400&q=80", rating: 4.9, experienceYears: 18, patientCount: 6100, availability: "Available Today" },
 ];
 
 const testimonials = [
@@ -83,6 +83,7 @@ const Hero = ({ navigate, currentUser }) => {
   const [isVideoLoading, setIsVideoLoading] = useState(true);
   const [videoError, setVideoError] = useState(false);
   const [isPlaying, setIsPlaying] = useState(true);
+  const [doctorProfiles, setDoctorProfiles] = useState(fallbackDoctors);
   const statsRef = useRef(null);
   const videoRef = useRef(null);
   const slideInterval = useRef(null);
@@ -100,6 +101,24 @@ const Hero = ({ navigate, currentUser }) => {
       setVideoError(false);
     }, 8000);
     return () => clearInterval(slideInterval.current);
+  }, []);
+
+  useEffect(() => {
+    const loadDoctorProfiles = async () => {
+      try {
+        const response = await fetch('http://localhost:8082/api/doctors');
+        if (!response.ok) return;
+        const data = await response.json();
+        const list = Array.isArray(data) ? data : [];
+        if (list.length > 0) {
+          setDoctorProfiles(list);
+        }
+      } catch {
+        // Keep fallback cards when doctor service is unavailable.
+      }
+    };
+
+    loadDoctorProfiles();
   }, []);
 
   // Video load handlers
@@ -463,32 +482,32 @@ const Hero = ({ navigate, currentUser }) => {
             <p className="text-gray-600 mt-4">Our board-certified doctors bring years of experience and compassion</p>
           </div>
           <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {doctors.map((doctor, idx) => (
+            {doctorProfiles.map((doctor, idx) => (
               <div key={idx} className="bg-white rounded-xl shadow-md overflow-hidden hover-scale transition-all">
                 <div className="relative h-64 overflow-hidden">
-                  <img src={doctor.img} alt={doctor.name} className="w-full h-full object-cover hover:scale-110 transition duration-500" />
+                  <img src={doctor.imageUrl || `https://i.pravatar.cc/400?u=${doctor.userId}`} alt={`Dr. ${doctor.firstName} ${doctor.lastName}`} className="w-full h-full object-cover hover:scale-110 transition duration-500" />
                   <div className={`absolute top-3 right-3 text-xs px-2 py-1 rounded-full ${
-                    doctor.availability === 'Available Today' ? 'bg-green-500 text-white' : 'bg-yellow-500 text-white'
+                    (doctor.availability || 'Available Today') === 'Available Today' ? 'bg-green-500 text-white' : 'bg-yellow-500 text-white'
                   }`}>
-                    {doctor.availability}
+                    {doctor.availability || 'Available Today'}
                   </div>
                 </div>
                 <div className="p-4">
-                  <h3 className="font-bold text-gray-800">{doctor.name}</h3>
-                  <p className="text-teal-600 text-sm font-medium">{doctor.specialty}</p>
+                  <h3 className="font-bold text-gray-800">Dr. {doctor.firstName} {doctor.lastName}</h3>
+                  <p className="text-teal-600 text-sm font-medium">{doctor.specialization || doctor.specialty || 'General Medicine'}</p>
                   <div className="flex justify-between text-xs text-gray-500 mt-2">
-                    <span>💼 {doctor.experience}</span>
-                    <span>👥 {doctor.patients}</span>
+                    <span>💼 {doctor.experienceYears || 0} yrs</span>
+                    <span>👥 {(doctor.patientCount || 0).toLocaleString()}+</span>
                   </div>
                   <div className="flex items-center gap-1 mt-2">
                     {[...Array(5)].map((_, i) => (
-                      <i key={i} className={`fas fa-star text-xs ${i < doctor.rating ? 'text-yellow-400' : 'text-gray-300'}`}></i>
+                      <i key={i} className={`fas fa-star text-xs ${i < Math.round(doctor.rating || 0) ? 'text-yellow-400' : 'text-gray-300'}`}></i>
                     ))}
                   </div>
                   <button 
                     onClick={() => {
                       if (currentUser) {
-                        navigate(`/appointment?doctor=${encodeURIComponent(doctor.name)}`);
+                        navigate(`/appointment?doctor=${encodeURIComponent(`${doctor.firstName} ${doctor.lastName}`)}`);
                       } else {
                         navigate('/login');
                       }

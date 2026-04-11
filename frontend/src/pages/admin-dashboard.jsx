@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { deleteUser, fetchUserById, fetchUsers, registerUser, updateUser } from '../lib/auth';
 import { deleteNotificationById, fetchNotificationSummary, fetchNotifications, sendNotificationById, updateNotificationStatus } from '../lib/notifications';
+import { createDoctorProfile, deleteDoctorProfile, fetchDoctorProfiles } from '../lib/doctors';
 
 const menu = [
   ['overview', 'fas fa-chart-line', 'Dashboard Overview'],
@@ -72,6 +73,21 @@ const toEditForm = (user) => ({
   active: user?.active ?? true,
 });
 
+const emptyDoctorProfileForm = {
+  firstName: '',
+  lastName: '',
+  specialization: '',
+  hospital: '',
+  email: '',
+  phoneNumber: '',
+  imageUrl: '',
+  availability: 'Available Today',
+  consultationFee: '2500',
+  rating: '5',
+  experienceYears: '5',
+  patientCount: '0',
+};
+
 const AdminDashboard = ({ navigate, currentUser, refreshUser }) => {
   const [activeTab, setActiveTab] = useState('overview');
   const [users, setUsers] = useState([]);
@@ -96,6 +112,9 @@ const AdminDashboard = ({ navigate, currentUser, refreshUser }) => {
   const [payments, setPayments] = useState([]);
   const [notifications, setNotifications] = useState([]);
   const [notificationSummary, setNotificationSummary] = useState(null);
+  const [doctorProfiles, setDoctorProfiles] = useState([]);
+  const [doctorProfileForm, setDoctorProfileForm] = useState(emptyDoctorProfileForm);
+  const [doctorProfileError, setDoctorProfileError] = useState('');
 
   const accessToken = currentUser?.accessToken;
 
@@ -138,6 +157,20 @@ const AdminDashboard = ({ navigate, currentUser, refreshUser }) => {
     } catch (err) {
       const message = err.message || 'Failed to load appointments.';
       setError(message);
+    } finally {
+      if (!silent) setLoading(false);
+    }
+  }, []);
+
+  const loadDoctorProfiles = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
+    setError('');
+
+    try {
+      const data = await fetchDoctorProfiles();
+      setDoctorProfiles(Array.isArray(data) ? data : []);
+    } catch (err) {
+      setError(err.message || 'Failed to load doctor profiles.');
     } finally {
       if (!silent) setLoading(false);
     }
@@ -208,6 +241,72 @@ const approvePayment = async (paymentId) => {
     alert("Failed to approve payment");
   }
 };
+
+  const handleDoctorProfileChange = (event) => {
+    const { name, value } = event.target;
+    setDoctorProfileError('');
+    setDoctorProfileForm((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const submitDoctorProfile = async (event) => {
+    event.preventDefault();
+    setBusyId('doctor-profile-create');
+    setError('');
+    setSuccess('');
+    setDoctorProfileError('');
+
+    if (!doctorProfileForm.firstName.trim() || !doctorProfileForm.lastName.trim()) {
+      const message = 'Doctor first name and last name are required.';
+      setDoctorProfileError(message);
+      setError(message);
+      setBusyId(null);
+      return;
+    }
+
+    try {
+      await createDoctorProfile({
+        firstName: doctorProfileForm.firstName.trim(),
+        lastName: doctorProfileForm.lastName.trim(),
+        specialty: doctorProfileForm.specialization.trim(),
+        specialization: doctorProfileForm.specialization.trim(),
+        hospital: doctorProfileForm.hospital.trim(),
+        email: doctorProfileForm.email.trim().toLowerCase(),
+        phoneNumber: doctorProfileForm.phoneNumber.trim(),
+        imageUrl: doctorProfileForm.imageUrl.trim(),
+        availability: doctorProfileForm.availability,
+        consultationFee: Number(doctorProfileForm.consultationFee) || 2500,
+        rating: Number(doctorProfileForm.rating) || 5,
+        experienceYears: Number(doctorProfileForm.experienceYears) || 0,
+        patientCount: Number(doctorProfileForm.patientCount) || 0,
+      });
+      setDoctorProfileForm(emptyDoctorProfileForm);
+      await loadDoctorProfiles(true);
+      setSuccess('Doctor profile added successfully. It will now appear in home and appointment doctor lists.');
+    } catch (err) {
+      const message = err.message || 'Failed to create doctor profile.';
+      setDoctorProfileError(message);
+      setError(message);
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const removeDoctorProfile = async (doctorId) => {
+    if (!window.confirm('Delete this doctor profile?')) return;
+
+    setBusyId(doctorId);
+    setError('');
+    setSuccess('');
+    try {
+      await deleteDoctorProfile(doctorId);
+      setDoctorProfiles((prev) => prev.filter((item) => item.userId !== doctorId));
+      setSuccess('Doctor profile deleted successfully.');
+    } catch (err) {
+      setError(err.message || 'Failed to delete doctor profile.');
+    } finally {
+      setBusyId(null);
+    }
+  };
 
   const loadNotifications = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
@@ -420,7 +519,8 @@ const approvePayment = async (paymentId) => {
     loadAppointments();
     loadPayments();
     loadNotifications(true);
-  }, [accessToken, currentUser, loadUsers, loadAppointments, loadPayments, loadNotifications, navigate]);
+    loadDoctorProfiles(true);
+  }, [accessToken, currentUser, loadUsers, loadAppointments, loadPayments, loadNotifications, loadDoctorProfiles, navigate]);
 
   const filteredUsers = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -539,9 +639,31 @@ const approvePayment = async (paymentId) => {
         ...createForm,
         email: createForm.email.trim().toLowerCase(),
       });
+
+      if (createForm.role === 'DOCTOR') {
+        await createDoctorProfile({
+          firstName: createForm.firstName.trim(),
+          lastName: createForm.lastName.trim(),
+          specialty: 'General Medicine',
+          specialization: 'General Medicine',
+          hospital: 'Not Assigned',
+          email: createForm.email.trim().toLowerCase(),
+          phoneNumber: createForm.phoneNumber.trim(),
+          imageUrl: '',
+          availability: 'Available Today',
+          consultationFee: 2500,
+          rating: 5,
+          experienceYears: 0,
+          patientCount: 0,
+        });
+      }
+
       setShowCreateModal(false);
       setCreateForm(emptyCreateForm);
       await loadUsers(true);
+      if (createForm.role === 'DOCTOR') {
+        await loadDoctorProfiles(true);
+      }
       setSuccess(`${createForm.role.toLowerCase()} account created successfully.`);
     } catch (err) {
       const message = err.message || 'Failed to create user.';
@@ -771,21 +893,63 @@ const approvePayment = async (paymentId) => {
             ) : null}
 
             {!loading && activeTab === 'doctors' ? (
-              <div className="rounded-2xl bg-white p-6 shadow-lg">
-                <h3 className="mb-4 text-lg font-bold text-gray-800">Doctor Accounts</h3>
-                <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-                  {doctors.length === 0 ? <p className="text-sm text-slate-500">No doctor accounts found.</p> : doctors.map((doctor) => (
-                    <div key={doctor.userId} className="rounded-xl border p-4">
-                      <div className="mb-3 flex items-center justify-between"><h4 className="font-bold text-gray-800">{fullName(doctor)}</h4><span className={`rounded-full px-2 py-1 text-xs font-medium ${doctor.active ? 'bg-green-100 text-green-700' : 'bg-rose-100 text-rose-700'}`}>{doctor.active ? 'active' : 'suspended'}</span></div>
-                      <p className="text-sm text-teal-600">{doctor.email}</p>
-                      <p className="mt-2 text-sm text-gray-500">Phone: {doctor.phoneNumber || 'N/A'}</p>
-                      <p className="mt-1 text-sm text-gray-500">OTP: {doctor.otpVerified ? 'Verified' : 'Pending'}</p>
-                      <div className="mt-4 flex gap-2">
-                        <button type="button" onClick={() => openUser(doctor.userId)} className="flex-1 rounded-lg bg-teal-600 py-2 font-medium text-white hover:bg-teal-700">View</button>
-                        <button type="button" onClick={() => startEditUser(doctor.userId)} className="flex-1 rounded-lg border border-amber-300 py-2 font-medium text-amber-700 hover:bg-amber-50">Edit</button>
-                      </div>
+              <div className="space-y-6">
+                <div className="rounded-2xl bg-white p-6 shadow-lg">
+                  <div className="mb-4 flex items-center justify-between">
+                    <h3 className="text-lg font-bold text-gray-800">Add Doctor Profile</h3>
+                    <button
+                      type="button"
+                      onClick={() => loadDoctorProfiles()}
+                      className="rounded-lg border border-teal-200 px-4 py-2 text-sm font-semibold text-teal-700 hover:bg-teal-50"
+                    >
+                      Refresh Profiles
+                    </button>
+                  </div>
+                  <p className="mb-4 text-sm text-gray-500">Create full doctor records with image and details. These records are used by home and appointment pages.</p>
+                  <form onSubmit={submitDoctorProfile} className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+                    <input name="firstName" value={doctorProfileForm.firstName} onChange={handleDoctorProfileChange} placeholder="First name" className="rounded-lg border px-4 py-2 outline-none focus:ring-2 focus:ring-teal-300" />
+                    <input name="lastName" value={doctorProfileForm.lastName} onChange={handleDoctorProfileChange} placeholder="Last name" className="rounded-lg border px-4 py-2 outline-none focus:ring-2 focus:ring-teal-300" />
+                    <input name="specialization" value={doctorProfileForm.specialization} onChange={handleDoctorProfileChange} placeholder="Specialization" className="rounded-lg border px-4 py-2 outline-none focus:ring-2 focus:ring-teal-300" />
+                    <input name="hospital" value={doctorProfileForm.hospital} onChange={handleDoctorProfileChange} placeholder="Hospital" className="rounded-lg border px-4 py-2 outline-none focus:ring-2 focus:ring-teal-300" />
+                    <input name="email" value={doctorProfileForm.email} onChange={handleDoctorProfileChange} placeholder="Email" className="rounded-lg border px-4 py-2 outline-none focus:ring-2 focus:ring-teal-300" />
+                    <input name="phoneNumber" value={doctorProfileForm.phoneNumber} onChange={handleDoctorProfileChange} placeholder="Phone number" className="rounded-lg border px-4 py-2 outline-none focus:ring-2 focus:ring-teal-300" />
+                    <input name="imageUrl" value={doctorProfileForm.imageUrl} onChange={handleDoctorProfileChange} placeholder="Doctor image URL" className="rounded-lg border px-4 py-2 outline-none focus:ring-2 focus:ring-teal-300" />
+                    <select name="availability" value={doctorProfileForm.availability} onChange={handleDoctorProfileChange} className="rounded-lg border px-4 py-2 outline-none focus:ring-2 focus:ring-teal-300">
+                      <option value="Available Today">Available Today</option>
+                      <option value="Available Tomorrow">Available Tomorrow</option>
+                      <option value="On Leave">On Leave</option>
+                    </select>
+                    <input type="number" min="0" name="consultationFee" value={doctorProfileForm.consultationFee} onChange={handleDoctorProfileChange} placeholder="Consultation Fee" className="rounded-lg border px-4 py-2 outline-none focus:ring-2 focus:ring-teal-300" />
+                    <input type="number" min="0" max="5" step="0.1" name="rating" value={doctorProfileForm.rating} onChange={handleDoctorProfileChange} placeholder="Rating" className="rounded-lg border px-4 py-2 outline-none focus:ring-2 focus:ring-teal-300" />
+                    <input type="number" min="0" name="experienceYears" value={doctorProfileForm.experienceYears} onChange={handleDoctorProfileChange} placeholder="Experience years" className="rounded-lg border px-4 py-2 outline-none focus:ring-2 focus:ring-teal-300" />
+                    <input type="number" min="0" name="patientCount" value={doctorProfileForm.patientCount} onChange={handleDoctorProfileChange} placeholder="Patient count" className="rounded-lg border px-4 py-2 outline-none focus:ring-2 focus:ring-teal-300" />
+                    <div className="md:col-span-2 lg:col-span-3">
+                      {doctorProfileError ? <p className="mb-3 text-sm text-rose-600">{doctorProfileError}</p> : null}
+                      <button type="submit" disabled={busyId === 'doctor-profile-create'} className="rounded-lg bg-teal-600 px-6 py-2 font-semibold text-white hover:bg-teal-700 disabled:opacity-50">
+                        {busyId === 'doctor-profile-create' ? 'Saving...' : 'Add Doctor Profile'}
+                      </button>
                     </div>
-                  ))}
+                  </form>
+                </div>
+
+                <div className="rounded-2xl bg-white p-6 shadow-lg">
+                  <h3 className="mb-4 text-lg font-bold text-gray-800">Doctor Profiles</h3>
+                  <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+                    {doctorProfiles.length === 0 ? <p className="text-sm text-slate-500">No doctor profiles found.</p> : doctorProfiles.map((doctor) => (
+                      <div key={doctor.userId} className="rounded-xl border p-4">
+                        <img src={doctor.imageUrl || `https://i.pravatar.cc/200?u=${doctor.userId}`} alt={`${doctor.firstName} ${doctor.lastName}`} className="mb-3 h-40 w-full rounded-lg object-cover" />
+                        <div className="mb-2 flex items-center justify-between"><h4 className="font-bold text-gray-800">Dr. {doctor.firstName} {doctor.lastName}</h4><span className="rounded-full bg-teal-100 px-2 py-1 text-xs font-medium text-teal-700">{doctor.availability || 'Available Today'}</span></div>
+                        <p className="text-sm text-teal-600">{doctor.specialization || doctor.specialty || 'General Medicine'}</p>
+                        <p className="mt-1 text-sm text-gray-500">Hospital: {doctor.hospital || 'N/A'}</p>
+                        <p className="mt-1 text-sm text-gray-500">Email: {doctor.email || 'N/A'}</p>
+                        <p className="mt-1 text-sm text-gray-500">Phone: {doctor.phoneNumber || 'N/A'}</p>
+                        <p className="mt-1 text-sm text-gray-500">Fee: LKR {doctor.consultationFee || 0}</p>
+                        <div className="mt-4 flex gap-2">
+                          <button type="button" onClick={() => removeDoctorProfile(doctor.userId)} disabled={busyId === doctor.userId} className="flex-1 rounded-lg border border-rose-300 py-2 font-medium text-rose-700 hover:bg-rose-50 disabled:opacity-50">Delete</button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
             ) : null}

@@ -483,7 +483,7 @@ const AppointmentPage = ({ navigate, currentUser }) => {
                   >
                     <div className="relative h-48 bg-gradient-to-br from-teal-100 to-cyan-100">
                       <img
-                        src={`https://i.pravatar.cc/300?u=${doctor.userId}&s=300`}
+                        src={doctor.imageUrl || `https://i.pravatar.cc/300?u=${doctor.userId}&s=300`}
                         alt={doctor.firstName}
                         className="w-full h-full object-cover"
                       />
@@ -496,8 +496,8 @@ const AppointmentPage = ({ navigate, currentUser }) => {
                       <h3 className="text-lg font-bold text-gray-900">
                         Dr. {doctor.firstName} {doctor.lastName}
                       </h3>
-                      {doctor.specialization && (
-                        <p className="text-teal-600 font-semibold mb-3">{doctor.specialization}</p>
+                      {(doctor.specialization || doctor.specialty) && (
+                        <p className="text-teal-600 font-semibold mb-3">{doctor.specialization || doctor.specialty}</p>
                       )}
 
                       <div className="flex items-center gap-2 mb-3">
@@ -545,7 +545,7 @@ const AppointmentPage = ({ navigate, currentUser }) => {
             <div className="flex items-center justify-between gap-6">
               <div className="flex items-center gap-6 flex-1">
                 <img
-                  src={`https://i.pravatar.cc/200?u=${selectedDoctor.userId}&s=200`}
+                  src={selectedDoctor.imageUrl || `https://i.pravatar.cc/200?u=${selectedDoctor.userId}&s=200`}
                   alt={selectedDoctor.firstName}
                   className="w-24 h-24 rounded-full border-4 border-white"
                 />
@@ -553,7 +553,7 @@ const AppointmentPage = ({ navigate, currentUser }) => {
                   <h2 className="text-3xl font-bold">
                     Dr. {selectedDoctor.firstName} {selectedDoctor.lastName}
                   </h2>
-                  <p className="text-teal-100 text-lg font-semibold">Specialist</p>
+                  <p className="text-teal-100 text-lg font-semibold">{selectedDoctor.specialization || selectedDoctor.specialty || 'Specialist'}</p>
                   <div className="mt-3 flex gap-6">
                     <div>
                       <p className="text-teal-100 text-sm">Experience</p>
