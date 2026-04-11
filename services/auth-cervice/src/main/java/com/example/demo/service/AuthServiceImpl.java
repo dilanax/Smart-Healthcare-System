@@ -26,7 +26,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Random;
-import java.security.MessageDigest;
 
 @Service
 @RequiredArgsConstructor
@@ -161,27 +160,28 @@ public class AuthServiceImpl implements AuthService, EmailService {
 
         return new ApiResponseDto("User fetched successfully", buildUserResponse(optionalUser.get()));
     }
-@Override
-public ApiResponseDto updateUser(Long userId, UpdateUserRequestDto requestDto) {
-    return userRepository.findById(userId)
-            .map(user -> {
-                // Update text fields
-                if (requestDto.getFirstName() != null) user.setFirstName(requestDto.getFirstName());
-                if (requestDto.getLastName() != null) user.setLastName(requestDto.getLastName());
-                if (requestDto.getPhoneNumber() != null) user.setPhoneNumber(requestDto.getPhoneNumber());
-                if (requestDto.getAge() != null) user.setAge((Integer) requestDto.getAge());
-                if (requestDto.getGender() != null) user.setGender(requestDto.getGender());
-                
-                // Update the image reference
-                if (requestDto.getProfilePictureUrl() != null) {
-                    user.setProfilePictureUrl((String) requestDto.getProfilePictureUrl());
-                }
-                
-                userRepository.save(user);
-                return new ApiResponseDto("Profile successfully synchronized", buildUserResponse(user));
-            })
-            .orElse(new ApiResponseDto("User record missing", null));
-}
+
+    @Override
+    public ApiResponseDto updateUser(Long userId, UpdateUserRequestDto requestDto) {
+        return userRepository.findById(userId)
+                .map(user -> {
+                    // Update text fields
+                    if (requestDto.getFirstName() != null) user.setFirstName(requestDto.getFirstName());
+                    if (requestDto.getLastName() != null) user.setLastName(requestDto.getLastName());
+                    if (requestDto.getPhoneNumber() != null) user.setPhoneNumber(requestDto.getPhoneNumber());
+                    if (requestDto.getAge() != null) user.setAge((Integer) requestDto.getAge());
+                    if (requestDto.getGender() != null) user.setGender(requestDto.getGender());
+                    
+                    // Update the image reference
+                    if (requestDto.getProfilePictureUrl() != null) {
+                        user.setProfilePictureUrl(requestDto.getProfilePictureUrl());
+                    }
+                    
+                    userRepository.save(user);
+                    return new ApiResponseDto("Profile successfully synchronized", buildUserResponse(user));
+                })
+                .orElse(new ApiResponseDto("User record missing", null));
+    }
 
     @Override
     public ApiResponseDto deleteUser(Long userId) {
@@ -263,7 +263,6 @@ public ApiResponseDto updateUser(Long userId, UpdateUserRequestDto requestDto) {
         return String.valueOf(100000 + new Random().nextInt(900000));
     }
 
-    // 1. Rename generateAdminToken to generateJwtToken and use it for everyone
     private String generateJwtToken(User user) {
         try {
             long now = LocalDateTime.now().toEpochSecond(ZoneOffset.UTC);
@@ -276,7 +275,7 @@ public ApiResponseDto updateUser(Long userId, UpdateUserRequestDto requestDto) {
             Map<String, Object> payload = new LinkedHashMap<>();
             payload.put("id", user.getId());
             payload.put("email", user.getEmail());
-            payload.put("role", user.getRole().name()); // Role is safely embedded here!
+            payload.put("role", user.getRole().name()); 
             payload.put("iat", now);
             payload.put("exp", exp);
             
@@ -288,7 +287,6 @@ public ApiResponseDto updateUser(Long userId, UpdateUserRequestDto requestDto) {
         }
     }
 
-    // 2. Give the token to ALL users, not just Admins!
     private Map<String, Object> buildLoginResponse(User user) {
         Map<String, Object> data = new HashMap<>();
         data.put("userId", user.getId());
@@ -296,12 +294,12 @@ public ApiResponseDto updateUser(Long userId, UpdateUserRequestDto requestDto) {
         data.put("role", user.getRole());
         data.put("name", user.getFirstName() + " " + user.getLastName());
         
-        // FIXED: Everyone gets an access token so they can access their own data
         data.put("accessToken", generateJwtToken(user));
         data.put("tokenType", "Bearer");
         
         return data;
     }
+
     private String sign(String content) throws Exception {
         Mac sha256Hmac = Mac.getInstance("HmacSHA256");
         sha256Hmac.init(new SecretKeySpec(jwtSecret.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
@@ -315,6 +313,12 @@ public ApiResponseDto updateUser(Long userId, UpdateUserRequestDto requestDto) {
         data.put("lastName", user.getLastName());
         data.put("email", user.getEmail());
         data.put("phoneNumber", user.getPhoneNumber());
+        
+        // FIXED: Expose the new fields back to the React UI!
+        data.put("age", user.getAge());
+        data.put("gender", user.getGender());
+        data.put("profilePictureUrl", user.getProfilePictureUrl());
+        
         data.put("role", user.getRole());
         data.put("active", user.isActive());
         data.put("otpVerified", user.isOtpVerified());
