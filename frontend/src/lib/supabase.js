@@ -1,14 +1,42 @@
 import { createClient } from '@supabase/supabase-js';
 
-// Get these from your Supabase project settings
-const SUPABASE_URL = 'https://YOUR_PROJECT_URL.supabase.co';  // CHANGE THIS
-const SUPABASE_ANON_KEY = 'YOUR_ANON_KEY';  // CHANGE THIS
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL?.trim();
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY?.trim();
+const SUPABASE_DOCTOR_IMAGES_BUCKET =
+  import.meta.env.VITE_SUPABASE_DOCTOR_IMAGES_BUCKET?.trim() || 'doctor-images';
 
-export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+let supabaseClient = null;
+
+const assertSupabaseConfig = () => {
+  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+    throw new Error(
+      'Supabase is not configured. Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in frontend/.env.local.',
+    );
+  }
+};
+
+const getSupabaseClient = () => {
+  assertSupabaseConfig();
+  if (!supabaseClient) {
+    supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  }
+  return supabaseClient;
+};
+
+const getFileExtension = (file) => {
+  const fileName = file?.name || '';
+  const parts = fileName.split('.');
+  if (parts.length > 1) {
+    return parts[parts.length - 1].toLowerCase();
+  }
+  return 'jpg';
+};
 
 // Function to upload image to Supabase
 export const uploadDoctorImage = async (file) => {
   try {
+    const supabase = getSupabaseClient();
+
     if (!file) {
       throw new Error('No file selected');
     }
@@ -16,12 +44,16 @@ export const uploadDoctorImage = async (file) => {
     // Generate unique filename: doctor-image-[timestamp]-[random]
     const timestamp = Date.now();
     const random = Math.random().toString(36).substring(7);
-    const fileName = `doctor-image-${timestamp}-${random}.jpg`;
+    const extension = getFileExtension(file);
+    const fileName = `doctor-image-${timestamp}-${random}.${extension}`;
 
     // Upload to Supabase storage in 'doctor-images' bucket
-    const { data, error } = await supabase.storage
-      .from('doctor-images')
-      .upload(fileName, file);
+    const { error } = await supabase.storage
+      .from(SUPABASE_DOCTOR_IMAGES_BUCKET)
+      .upload(fileName, file, {
+        upsert: false,
+        contentType: file.type || undefined,
+      });
 
     if (error) {
       throw new Error(`Upload failed: ${error.message}`);
@@ -29,7 +61,7 @@ export const uploadDoctorImage = async (file) => {
 
     // Get public URL for the uploaded image
     const { data: urlData } = supabase.storage
-      .from('doctor-images')
+      .from(SUPABASE_DOCTOR_IMAGES_BUCKET)
       .getPublicUrl(fileName);
 
     return urlData.publicUrl;
@@ -42,13 +74,15 @@ export const uploadDoctorImage = async (file) => {
 // Function to delete image from Supabase
 export const deleteDoctorImage = async (imageUrl) => {
   try {
+    const supabase = getSupabaseClient();
+
     if (!imageUrl) return;
 
     // Extract filename from URL
     const fileName = imageUrl.split('/').pop();
 
     const { error } = await supabase.storage
-      .from('doctor-images')
+      .from(SUPABASE_DOCTOR_IMAGES_BUCKET)
       .remove([fileName]);
 
     if (error) {

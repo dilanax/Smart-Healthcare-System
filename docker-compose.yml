@@ -159,6 +159,7 @@ services:
       - "5173:5173"
     environment:
       VITE_API_BASE_URL: http://localhost:8081
+      VITE_NOTIFICATION_API_BASE_URL: http://localhost:8084
     depends_on:
       - auth-service
       - doctor-service

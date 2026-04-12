@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { deleteUser, fetchUserById, fetchUsers, registerUser, updateUser } from '../lib/auth';
 import { deleteNotificationById, fetchNotificationSummary, fetchNotifications, sendNotificationById, updateNotificationStatus } from '../lib/notifications';
-import { createDoctorProfile, deleteDoctorProfile, fetchDoctorProfiles } from '../lib/doctors';
+import { createDoctorProfile, deleteDoctorProfile, fetchDoctorProfiles, updateDoctorProfile } from '../lib/doctors';
 import { uploadDoctorImage } from '../lib/supabase';
 
 const menu = [
@@ -89,6 +89,21 @@ const emptyDoctorProfileForm = {
   patientCount: '0',
 };
 
+const toDoctorProfileForm = (doctor) => ({
+  firstName: doctor?.firstName ?? '',
+  lastName: doctor?.lastName ?? '',
+  specialization: doctor?.specialization ?? doctor?.specialty ?? '',
+  hospital: doctor?.hospital ?? '',
+  email: doctor?.email ?? '',
+  phoneNumber: doctor?.phoneNumber ?? '',
+  imageUrl: doctor?.imageUrl ?? '',
+  availability: doctor?.availability ?? 'Available Today',
+  consultationFee: String(doctor?.consultationFee ?? '2500'),
+  rating: String(doctor?.rating ?? '5'),
+  experienceYears: String(doctor?.experienceYears ?? '5'),
+  patientCount: String(doctor?.patientCount ?? '0'),
+});
+
 const AdminDashboard = ({ navigate, currentUser, refreshUser }) => {
   const [activeTab, setActiveTab] = useState('overview');
   const [users, setUsers] = useState([]);
@@ -118,6 +133,7 @@ const AdminDashboard = ({ navigate, currentUser, refreshUser }) => {
   const [doctorProfileError, setDoctorProfileError] = useState('');
   const [doctorImageFile, setDoctorImageFile] = useState(null);
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [editingDoctorId, setEditingDoctorId] = useState(null);
 
   const accessToken = currentUser?.accessToken;
 
@@ -251,9 +267,25 @@ const approvePayment = async (paymentId) => {
     setDoctorProfileForm((prev) => ({ ...prev, [name]: value }));
   };
 
+  const startEditDoctorProfile = (doctor) => {
+    setDoctorProfileError('');
+    setError('');
+    setSuccess('');
+    setEditingDoctorId(doctor.userId);
+    setDoctorProfileForm(toDoctorProfileForm(doctor));
+    setDoctorImageFile(null);
+  };
+
+  const cancelDoctorProfileEdit = () => {
+    setEditingDoctorId(null);
+    setDoctorProfileForm(emptyDoctorProfileForm);
+    setDoctorImageFile(null);
+    setDoctorProfileError('');
+  };
+
   const submitDoctorProfile = async (event) => {
     event.preventDefault();
-    setBusyId('doctor-profile-create');
+    setBusyId('doctor-profile-submit');
     setError('');
     setSuccess('');
     setDoctorProfileError('');
@@ -276,7 +308,7 @@ const approvePayment = async (paymentId) => {
         setUploadingImage(false);
       }
 
-      await createDoctorProfile({
+      const payload = {
         firstName: doctorProfileForm.firstName.trim(),
         lastName: doctorProfileForm.lastName.trim(),
         specialty: doctorProfileForm.specialization.trim(),
@@ -290,13 +322,25 @@ const approvePayment = async (paymentId) => {
         rating: Number(doctorProfileForm.rating) || 5,
         experienceYears: Number(doctorProfileForm.experienceYears) || 0,
         patientCount: Number(doctorProfileForm.patientCount) || 0,
-      });
+      };
+
+      if (editingDoctorId) {
+        await updateDoctorProfile(editingDoctorId, payload);
+      } else {
+        await createDoctorProfile(payload);
+      }
+
       setDoctorProfileForm(emptyDoctorProfileForm);
       setDoctorImageFile(null);
+      setEditingDoctorId(null);
       await loadDoctorProfiles(true);
-      setSuccess('Doctor profile added successfully. It will now appear in home and appointment doctor lists.');
+      setSuccess(
+        editingDoctorId
+          ? 'Doctor profile updated successfully.'
+          : 'Doctor profile added successfully. It will now appear in home and appointment doctor lists.',
+      );
     } catch (err) {
-      const message = err.message || 'Failed to create doctor profile.';
+      const message = err.message || (editingDoctorId ? 'Failed to update doctor profile.' : 'Failed to create doctor profile.');
       setDoctorProfileError(message);
       setError(message);
     } finally {
@@ -919,6 +963,18 @@ const approvePayment = async (paymentId) => {
                       Refresh Profiles
                     </button>
                   </div>
+                  {editingDoctorId ? (
+                    <div className="mb-4 flex items-center justify-between rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                      <span>You are editing doctor profile #{editingDoctorId}.</span>
+                      <button
+                        type="button"
+                        onClick={cancelDoctorProfileEdit}
+                        className="font-semibold text-amber-900 hover:text-amber-950"
+                      >
+                        Cancel Edit
+                      </button>
+                    </div>
+                  ) : null}
                   <p className="mb-4 text-sm text-gray-500">Create full doctor records with image and details. These records are used by home and appointment pages.</p>
                   <form onSubmit={submitDoctorProfile} className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
                     <input name="firstName" value={doctorProfileForm.firstName} onChange={handleDoctorProfileChange} placeholder="First name" className="rounded-lg border px-4 py-2 outline-none focus:ring-2 focus:ring-teal-300" />
@@ -950,9 +1006,20 @@ const approvePayment = async (paymentId) => {
                     <input type="number" min="0" name="patientCount" value={doctorProfileForm.patientCount} onChange={handleDoctorProfileChange} placeholder="Patient count" className="rounded-lg border px-4 py-2 outline-none focus:ring-2 focus:ring-teal-300" />
                     <div className="md:col-span-2 lg:col-span-3">
                       {doctorProfileError ? <p className="mb-3 text-sm text-rose-600">{doctorProfileError}</p> : null}
-                      <button type="submit" disabled={busyId === 'doctor-profile-create' || uploadingImage} className="rounded-lg bg-teal-600 px-6 py-2 font-semibold text-white hover:bg-teal-700 disabled:opacity-50">
-                        {uploadingImage ? 'Uploading image...' : busyId === 'doctor-profile-create' ? 'Saving...' : 'Add Doctor Profile'}
-                      </button>
+                      <div className="flex flex-wrap gap-3">
+                        <button type="submit" disabled={busyId === 'doctor-profile-submit' || uploadingImage} className="rounded-lg bg-teal-600 px-6 py-2 font-semibold text-white hover:bg-teal-700 disabled:opacity-50">
+                          {uploadingImage ? 'Uploading image...' : busyId === 'doctor-profile-submit' ? 'Saving...' : editingDoctorId ? 'Update Doctor Profile' : 'Add Doctor Profile'}
+                        </button>
+                        {editingDoctorId ? (
+                          <button
+                            type="button"
+                            onClick={cancelDoctorProfileEdit}
+                            className="rounded-lg border border-slate-300 px-6 py-2 font-semibold text-slate-700 hover:bg-slate-50"
+                          >
+                            Cancel
+                          </button>
+                        ) : null}
+                      </div>
                     </div>
                   </form>
                 </div>
@@ -970,6 +1037,7 @@ const approvePayment = async (paymentId) => {
                         <p className="mt-1 text-sm text-gray-500">Phone: {doctor.phoneNumber || 'N/A'}</p>
                         <p className="mt-1 text-sm text-gray-500">Fee: LKR {doctor.consultationFee || 0}</p>
                         <div className="mt-4 flex gap-2">
+                          <button type="button" onClick={() => startEditDoctorProfile(doctor)} className="flex-1 rounded-lg border border-teal-300 py-2 font-medium text-teal-700 hover:bg-teal-50">Edit</button>
                           <button type="button" onClick={() => removeDoctorProfile(doctor.userId)} disabled={busyId === doctor.userId} className="flex-1 rounded-lg border border-rose-300 py-2 font-medium text-rose-700 hover:bg-rose-50 disabled:opacity-50">Delete</button>
                         </div>
                       </div>
