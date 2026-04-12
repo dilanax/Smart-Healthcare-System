@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { deleteUser, fetchUserById, fetchUsers, registerUser, updateUser } from '../lib/auth';
 import { deleteNotificationById, fetchNotificationSummary, fetchNotifications, sendNotificationById, updateNotificationStatus } from '../lib/notifications';
 import { createDoctorProfile, deleteDoctorProfile, fetchDoctorProfiles } from '../lib/doctors';
+import { uploadDoctorImage } from '../lib/supabase';
 
 const menu = [
   ['overview', 'fas fa-chart-line', 'Dashboard Overview'],
@@ -115,6 +116,8 @@ const AdminDashboard = ({ navigate, currentUser, refreshUser }) => {
   const [doctorProfiles, setDoctorProfiles] = useState([]);
   const [doctorProfileForm, setDoctorProfileForm] = useState(emptyDoctorProfileForm);
   const [doctorProfileError, setDoctorProfileError] = useState('');
+  const [doctorImageFile, setDoctorImageFile] = useState(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
 
   const accessToken = currentUser?.accessToken;
 
@@ -264,6 +267,15 @@ const approvePayment = async (paymentId) => {
     }
 
     try {
+      let imageUrl = doctorProfileForm.imageUrl.trim();
+
+      // If user selected an image file, upload it to Supabase first
+      if (doctorImageFile) {
+        setUploadingImage(true);
+        imageUrl = await uploadDoctorImage(doctorImageFile);
+        setUploadingImage(false);
+      }
+
       await createDoctorProfile({
         firstName: doctorProfileForm.firstName.trim(),
         lastName: doctorProfileForm.lastName.trim(),
@@ -272,7 +284,7 @@ const approvePayment = async (paymentId) => {
         hospital: doctorProfileForm.hospital.trim(),
         email: doctorProfileForm.email.trim().toLowerCase(),
         phoneNumber: doctorProfileForm.phoneNumber.trim(),
-        imageUrl: doctorProfileForm.imageUrl.trim(),
+        imageUrl: imageUrl,
         availability: doctorProfileForm.availability,
         consultationFee: Number(doctorProfileForm.consultationFee) || 2500,
         rating: Number(doctorProfileForm.rating) || 5,
@@ -280,6 +292,7 @@ const approvePayment = async (paymentId) => {
         patientCount: Number(doctorProfileForm.patientCount) || 0,
       });
       setDoctorProfileForm(emptyDoctorProfileForm);
+      setDoctorImageFile(null);
       await loadDoctorProfiles(true);
       setSuccess('Doctor profile added successfully. It will now appear in home and appointment doctor lists.');
     } catch (err) {
@@ -288,6 +301,7 @@ const approvePayment = async (paymentId) => {
       setError(message);
     } finally {
       setBusyId(null);
+      setUploadingImage(false);
     }
   };
 
@@ -913,7 +927,18 @@ const approvePayment = async (paymentId) => {
                     <input name="hospital" value={doctorProfileForm.hospital} onChange={handleDoctorProfileChange} placeholder="Hospital" className="rounded-lg border px-4 py-2 outline-none focus:ring-2 focus:ring-teal-300" />
                     <input name="email" value={doctorProfileForm.email} onChange={handleDoctorProfileChange} placeholder="Email" className="rounded-lg border px-4 py-2 outline-none focus:ring-2 focus:ring-teal-300" />
                     <input name="phoneNumber" value={doctorProfileForm.phoneNumber} onChange={handleDoctorProfileChange} placeholder="Phone number" className="rounded-lg border px-4 py-2 outline-none focus:ring-2 focus:ring-teal-300" />
-                    <input name="imageUrl" value={doctorProfileForm.imageUrl} onChange={handleDoctorProfileChange} placeholder="Doctor image URL" className="rounded-lg border px-4 py-2 outline-none focus:ring-2 focus:ring-teal-300" />
+                    <div className="col-span-1 md:col-span-2">
+                      <label className="mb-2 block text-sm font-semibold text-gray-700">Doctor Image</label>
+                      <div className="flex gap-2">
+                        <input type="file" accept="image/*" onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) setDoctorImageFile(file);
+                        }} placeholder="Upload image from gallery" className="flex-1 rounded-lg border px-4 py-2 file:mr-3 file:rounded file:border-0 file:bg-teal-500 file:px-3 file:py-1 file:text-white file:cursor-pointer outline-none focus:ring-2 focus:ring-teal-300" />
+                        {doctorImageFile && <span className="flex items-center rounded bg-green-100 px-3 py-1 text-xs text-green-700 font-semibold">✓ {doctorImageFile.name}</span>}
+                      </div>
+                      <p className="mt-1 text-xs text-gray-500">Or enter image URL below if you prefer</p>
+                    </div>
+                    <input name="imageUrl" value={doctorProfileForm.imageUrl} onChange={handleDoctorProfileChange} placeholder="Doctor image URL (optional if file selected)" className="rounded-lg border px-4 py-2 outline-none focus:ring-2 focus:ring-teal-300" />
                     <select name="availability" value={doctorProfileForm.availability} onChange={handleDoctorProfileChange} className="rounded-lg border px-4 py-2 outline-none focus:ring-2 focus:ring-teal-300">
                       <option value="Available Today">Available Today</option>
                       <option value="Available Tomorrow">Available Tomorrow</option>
@@ -925,8 +950,8 @@ const approvePayment = async (paymentId) => {
                     <input type="number" min="0" name="patientCount" value={doctorProfileForm.patientCount} onChange={handleDoctorProfileChange} placeholder="Patient count" className="rounded-lg border px-4 py-2 outline-none focus:ring-2 focus:ring-teal-300" />
                     <div className="md:col-span-2 lg:col-span-3">
                       {doctorProfileError ? <p className="mb-3 text-sm text-rose-600">{doctorProfileError}</p> : null}
-                      <button type="submit" disabled={busyId === 'doctor-profile-create'} className="rounded-lg bg-teal-600 px-6 py-2 font-semibold text-white hover:bg-teal-700 disabled:opacity-50">
-                        {busyId === 'doctor-profile-create' ? 'Saving...' : 'Add Doctor Profile'}
+                      <button type="submit" disabled={busyId === 'doctor-profile-create' || uploadingImage} className="rounded-lg bg-teal-600 px-6 py-2 font-semibold text-white hover:bg-teal-700 disabled:opacity-50">
+                        {uploadingImage ? 'Uploading image...' : busyId === 'doctor-profile-create' ? 'Saving...' : 'Add Doctor Profile'}
                       </button>
                     </div>
                   </form>
