@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import Navbar from '../components/navbar';
 
+const getDoctorId = (doctor) => Number(doctor?.userId ?? doctor?.id ?? 0);
+
 const AppointmentPage = ({ navigate, currentUser }) => {
   const [doctors, setDoctors] = useState([]);
   const [selectedDoctor, setSelectedDoctor] = useState(null);
@@ -77,17 +79,29 @@ const AppointmentPage = ({ navigate, currentUser }) => {
   }, [selectedDoctor, appointmentDate]);
 
   const fetchBookedSlots = async () => {
+    const doctorId = getDoctorId(selectedDoctor);
+    if (!doctorId || !appointmentDate) {
+      setBookedSlots([]);
+      return;
+    }
+
     try {
       setLoadingSlots(true);
+      setBookedSlots([]);
       // Fetch existing appointments for this doctor and date
       const response = await fetch(
-        `http://localhost:8085/api/appointments?doctorId=${selectedDoctor.userId}&appointmentDate=${appointmentDate}`
+        `http://localhost:8085/api/appointments?doctorId=${doctorId}&appointmentDate=${appointmentDate}`
       );
       if (response.ok) {
         const data = await response.json();
-        // Extract booked times from appointments and normalize format (remove seconds if present)
+        // Extract booked times from appointments and normalize format (remove seconds if present).
+        // Keep blocking scoped to this doctor + date and active statuses only.
         const appointments = Array.isArray(data) ? data : data.data || [];
+        const isBlockingStatus = (status) => ['PENDING', 'CONFIRMED', 'COMPLETED'].includes(String(status || '').toUpperCase());
         const booked = appointments
+          .filter((apt) => Number(apt?.doctorId) === doctorId)
+          .filter((apt) => String(apt?.appointmentDate || '') === appointmentDate)
+          .filter((apt) => isBlockingStatus(apt?.status))
           .map(apt => {
             const time = apt.appointmentTime;
             if (!time) return null;
@@ -95,7 +109,7 @@ const AppointmentPage = ({ navigate, currentUser }) => {
             return time.indexOf(':') !== -1 ? time.substring(0, 5) : time;
           })
           .filter(Boolean);
-        setBookedSlots(booked);
+        setBookedSlots([...new Set(booked)]);
       } else {
         setBookedSlots([]);
       }
@@ -267,7 +281,7 @@ const AppointmentPage = ({ navigate, currentUser }) => {
       
       const payload = {
         patientId: parseInt(patientId),
-        doctorId: parseInt(selectedDoctor.userId),
+        doctorId: getDoctorId(selectedDoctor),
         doctorFirstName: selectedDoctor.firstName,
         doctorLastName: selectedDoctor.lastName,
         appointmentDate: appointmentDate,
