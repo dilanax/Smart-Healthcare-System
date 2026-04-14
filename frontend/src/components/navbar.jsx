@@ -1,9 +1,15 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { clearStoredUser } from '../lib/auth';
+import { fetchNotifications } from '../lib/notifications';
 
 const Navbar = ({ navigate, currentUser }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [activeLink, setActiveLink] = useState('home');
+  const [isBellOpen, setIsBellOpen] = useState(false);
+  const [bellLoading, setBellLoading] = useState(false);
+  const [bellError, setBellError] = useState('');
+  const [myNotifications, setMyNotifications] = useState([]);
+  const bellRef = useRef(null);
 
   const navLinks = [
     { id: 'home', label: 'Home', icon: 'fas fa-home' },
@@ -14,6 +20,44 @@ const Navbar = ({ navigate, currentUser }) => {
   ];
 
   const isAdmin = currentUser?.role === 'ADMIN';
+
+  const loadMyNotifications = async () => {
+    if (!currentUser) return;
+
+    setBellLoading(true);
+    setBellError('');
+    try {
+      const response = await fetchNotifications();
+      const list = Array.isArray(response?.data) ? response.data : [];
+      const email = (currentUser.email || '').toLowerCase();
+      const role = (currentUser.role || '').toUpperCase();
+
+      const filtered = list
+        .filter((item) => {
+          const recipientEmail = (item?.recipientEmail || '').toLowerCase();
+          const audienceType = (item?.audienceType || '').toUpperCase();
+          return recipientEmail === email || audienceType === role;
+        })
+        .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+
+      setMyNotifications(filtered.slice(0, 10));
+    } catch (err) {
+      setBellError(err.message || 'Failed to load notifications.');
+    } finally {
+      setBellLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    const handleOutsideClick = (event) => {
+      if (bellRef.current && !bellRef.current.contains(event.target)) {
+        setIsBellOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleOutsideClick);
+    return () => document.removeEventListener('mousedown', handleOutsideClick);
+  }, []);
 
   const scrollToSection = (sectionId) => {
     if (window.location.pathname !== '/') {
@@ -40,6 +84,19 @@ const Navbar = ({ navigate, currentUser }) => {
     clearStoredUser();
     setIsMenuOpen(false);
     navigate('/');
+  };
+
+  const handleBellClick = async () => {
+    if (!currentUser) {
+      navigate('/login');
+      return;
+    }
+
+    const next = !isBellOpen;
+    setIsBellOpen(next);
+    if (next) {
+      await loadMyNotifications();
+    }
   };
 
   return (
@@ -75,6 +132,58 @@ const Navbar = ({ navigate, currentUser }) => {
               </button>
             ))}
 
+            <div className="relative ml-4" ref={bellRef}>
+              <button
+                type="button"
+                onClick={handleBellClick}
+                className="relative rounded-full border border-teal-200 px-3 py-2 text-teal-700 transition hover:bg-teal-50"
+                aria-label="Open notifications"
+              >
+                <span className="text-base leading-none" aria-hidden="true">🔔</span>
+                {currentUser && myNotifications.length > 0 ? (
+                  <span className="absolute -right-1 -top-1 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-rose-500 px-1 text-xs font-bold text-white">
+                    {myNotifications.length}
+                  </span>
+                ) : null}
+              </button>
+
+              {isBellOpen ? (
+                <div className="absolute right-0 z-50 mt-2 w-80 rounded-2xl border border-gray-100 bg-white p-3 shadow-xl">
+                  <div className="mb-2 flex items-center justify-between px-2">
+                    <p className="text-sm font-bold text-gray-800">Notifications</p>
+                    <button
+                      type="button"
+                      onClick={loadMyNotifications}
+                      className="text-xs font-semibold text-teal-700 hover:text-teal-900"
+                    >
+                      Refresh
+                    </button>
+                  </div>
+
+                  {bellLoading ? <p className="px-2 py-4 text-sm text-gray-500">Loading...</p> : null}
+                  {!bellLoading && bellError ? <p className="px-2 py-4 text-sm text-rose-600">{bellError}</p> : null}
+                  {!bellLoading && !bellError && myNotifications.length === 0 ? (
+                    <p className="px-2 py-4 text-sm text-gray-500">No notifications yet.</p>
+                  ) : null}
+
+                  {!bellLoading && !bellError && myNotifications.length > 0 ? (
+                    <div className="max-h-80 space-y-2 overflow-y-auto pr-1">
+                      {myNotifications.map((item) => (
+                        <div key={item.id} className="rounded-xl border border-gray-100 p-3">
+                          <p className="text-sm font-semibold text-gray-800">{item.subject || 'Notification'}</p>
+                          <p className="mt-1 line-clamp-2 text-xs text-gray-600">{item.message}</p>
+                          <div className="mt-2 flex items-center justify-between text-[11px] text-gray-500">
+                            <span>{item.channel || 'N/A'}</span>
+                            <span>{item.status || 'N/A'}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
+            </div>
+
             {currentUser ? (
               <div className="ml-4 flex items-center gap-3">
                 {isAdmin ? (
@@ -99,7 +208,7 @@ const Navbar = ({ navigate, currentUser }) => {
                 <button
                   type="button"
                   onClick={handleLogout}
-                  className="rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
+                  className="rounded-full bg-red-600 text-white px-4 py-2 text-sm font-semibold transition hover:bg-red-700"
                 >
                   Logout
                 </button>
@@ -152,6 +261,23 @@ const Navbar = ({ navigate, currentUser }) => {
               ))}
 
               <div className="space-y-2 px-4 pt-2">
+                <button
+                  type="button"
+                  onClick={async () => {
+                    setIsMenuOpen(false);
+                    if (!currentUser) {
+                      navigate('/login');
+                      return;
+                    }
+                    await loadMyNotifications();
+                    window.alert(`You have ${myNotifications.length} notification(s). Open desktop view for detailed list.`);
+                  }}
+                  className="flex w-full items-center justify-center gap-2 rounded-xl border border-teal-200 py-3 font-semibold text-teal-700"
+                >
+                  <span aria-hidden="true">🔔</span>
+                  Notifications
+                </button>
+
                 {currentUser ? (
                   <>
                     {isAdmin ? (

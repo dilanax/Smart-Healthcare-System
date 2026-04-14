@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import Navbar from '../components/navbar';
 
+const getDoctorId = (doctor) => Number(doctor?.userId ?? doctor?.id ?? 0);
+
 const AppointmentPage = ({ navigate, currentUser }) => {
   const [doctors, setDoctors] = useState([]);
   const [selectedDoctor, setSelectedDoctor] = useState(null);
@@ -77,17 +79,29 @@ const AppointmentPage = ({ navigate, currentUser }) => {
   }, [selectedDoctor, appointmentDate]);
 
   const fetchBookedSlots = async () => {
+    const doctorId = getDoctorId(selectedDoctor);
+    if (!doctorId || !appointmentDate) {
+      setBookedSlots([]);
+      return;
+    }
+
     try {
       setLoadingSlots(true);
+      setBookedSlots([]);
       // Fetch existing appointments for this doctor and date
       const response = await fetch(
-        `http://localhost:8085/api/appointments?doctorId=${selectedDoctor.userId}&appointmentDate=${appointmentDate}`
+        `http://localhost:8085/api/appointments?doctorId=${doctorId}&appointmentDate=${appointmentDate}`
       );
       if (response.ok) {
         const data = await response.json();
-        // Extract booked times from appointments and normalize format (remove seconds if present)
+        // Extract booked times from appointments and normalize format (remove seconds if present).
+        // Keep blocking scoped to this doctor + date and active statuses only.
         const appointments = Array.isArray(data) ? data : data.data || [];
+        const isBlockingStatus = (status) => ['PENDING', 'CONFIRMED', 'COMPLETED'].includes(String(status || '').toUpperCase());
         const booked = appointments
+          .filter((apt) => Number(apt?.doctorId) === doctorId)
+          .filter((apt) => String(apt?.appointmentDate || '') === appointmentDate)
+          .filter((apt) => isBlockingStatus(apt?.status))
           .map(apt => {
             const time = apt.appointmentTime;
             if (!time) return null;
@@ -95,7 +109,7 @@ const AppointmentPage = ({ navigate, currentUser }) => {
             return time.indexOf(':') !== -1 ? time.substring(0, 5) : time;
           })
           .filter(Boolean);
-        setBookedSlots(booked);
+        setBookedSlots([...new Set(booked)]);
       } else {
         setBookedSlots([]);
       }
@@ -267,7 +281,7 @@ const AppointmentPage = ({ navigate, currentUser }) => {
       
       const payload = {
         patientId: parseInt(patientId),
-        doctorId: parseInt(selectedDoctor.userId),
+        doctorId: getDoctorId(selectedDoctor),
         doctorFirstName: selectedDoctor.firstName,
         doctorLastName: selectedDoctor.lastName,
         appointmentDate: appointmentDate,
@@ -283,14 +297,37 @@ const AppointmentPage = ({ navigate, currentUser }) => {
         },
         body: JSON.stringify(payload),
       });
-
       if (response.ok) {
-        setGeneratedToken(token);
-        setSuccess(`✅ Appointment booked successfully! Your Appointment Token: ${token}`);
-        setTimeout(() => {
-          navigate('/');
-        }, 3000);
-      } else {
+         const appointmentResult = await response.json();
+         const appointmentId =
+         appointmentResult.appointmentId || appointmentResult.id;
+
+         setGeneratedToken(token);
+         setSuccess(`✅ Appointment booked successfully! Your Appointment Token: ${token}`);
+
+        // ✅ STEP 1 HAPPENS HERE
+        // Store appointment + doctor fee for payment page
+        localStorage.setItem(
+        "paymentInfo",
+        JSON.stringify({
+          appointmentId: appointmentId,
+          doctor: `${selectedDoctor.firstName} ${selectedDoctor.lastName}`,
+          doctorEmail: selectedDoctor.email || `doctor${selectedDoctor.userId}@healthcare.local`,
+          doctorPhone: selectedDoctor.phone || selectedDoctor.phoneNumber || '+94000000000',
+          patientName: userDetails.name,
+          patientEmail: userDetails.email,
+          patientPhone: userDetails.phone,
+          date: appointmentDate,
+          time: selectedTime,
+          amount: selectedDoctor.consultationFee || 2500
+        })
+      );
+
+       // ✅ Go to payment page
+  navigate("/payment");
+}
+
+       else {
         const errorData = await response.json();
         setServerError(
           errorData.message || 'Failed to book appointment. Please try again.'
@@ -460,7 +497,7 @@ const AppointmentPage = ({ navigate, currentUser }) => {
                   >
                     <div className="relative h-48 bg-gradient-to-br from-teal-100 to-cyan-100">
                       <img
-                        src={`https://i.pravatar.cc/300?u=${doctor.userId}&s=300`}
+                        src={doctor.imageUrl || `https://i.pravatar.cc/300?u=${doctor.userId}&s=300`}
                         alt={doctor.firstName}
                         className="w-full h-full object-cover"
                       />
@@ -473,8 +510,8 @@ const AppointmentPage = ({ navigate, currentUser }) => {
                       <h3 className="text-lg font-bold text-gray-900">
                         Dr. {doctor.firstName} {doctor.lastName}
                       </h3>
-                      {doctor.specialization && (
-                        <p className="text-teal-600 font-semibold mb-3">{doctor.specialization}</p>
+                      {(doctor.specialization || doctor.specialty) && (
+                        <p className="text-teal-600 font-semibold mb-3">{doctor.specialization || doctor.specialty}</p>
                       )}
 
                       <div className="flex items-center gap-2 mb-3">
@@ -522,7 +559,7 @@ const AppointmentPage = ({ navigate, currentUser }) => {
             <div className="flex items-center justify-between gap-6">
               <div className="flex items-center gap-6 flex-1">
                 <img
-                  src={`https://i.pravatar.cc/200?u=${selectedDoctor.userId}&s=200`}
+                  src={selectedDoctor.imageUrl || `https://i.pravatar.cc/200?u=${selectedDoctor.userId}&s=200`}
                   alt={selectedDoctor.firstName}
                   className="w-24 h-24 rounded-full border-4 border-white"
                 />
@@ -530,7 +567,7 @@ const AppointmentPage = ({ navigate, currentUser }) => {
                   <h2 className="text-3xl font-bold">
                     Dr. {selectedDoctor.firstName} {selectedDoctor.lastName}
                   </h2>
-                  <p className="text-teal-100 text-lg font-semibold">Specialist</p>
+                  <p className="text-teal-100 text-lg font-semibold">{selectedDoctor.specialization || selectedDoctor.specialty || 'Specialist'}</p>
                   <div className="mt-3 flex gap-6">
                     <div>
                       <p className="text-teal-100 text-sm">Experience</p>

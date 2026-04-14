@@ -1,11 +1,104 @@
 import { useState, useEffect } from 'react';
 import Navbar from '../components/navbar';
 
+const STORAGE_KEY_PRESCRIPTIONS = 'doctor_prescriptions';
+
+const buildJitsiCallUrl = (roomName, displayName) =>
+  `https://meet.jit.si/${encodeURIComponent(roomName)}#userInfo.displayName=${encodeURIComponent(displayName)}&config.startWithVideoMuted=false&config.startWithAudioMuted=false&config.prejoinPageEnabled=false`;
+
+const getMediaPermissionError = (error) => {
+  if (error?.name === 'NotAllowedError') {
+    return 'Camera/Microphone permission denied. Click the lock icon near URL and allow camera + microphone.';
+  }
+  if (error?.name === 'NotFoundError') {
+    return 'No camera device found on this computer (or camera is blocked).';
+  }
+  if (error?.name === 'NotReadableError') {
+    return 'Camera is busy in another app (Teams/Zoom/Camera). Close other apps and try again.';
+  }
+  return 'Unable to access camera/microphone on this browser.';
+};
+
 const ProfilePage = ({ navigate, currentUser }) => {
   const [userDetails, setUserDetails] = useState(null);
   const [appointments, setAppointments] = useState([]);
+  const [prescriptions, setPrescriptions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [activeCall, setActiveCall] = useState(null);
+  const [mediaReady, setMediaReady] = useState(false);
+
+  const getAppointmentId = (appointment) => appointment?.appointmentId ?? appointment?.id;
+
+  const canJoinTelemedicine = (appointment) => {
+    const status = String(appointment?.status || '').toUpperCase();
+    return status === 'CONFIRMED';
+  };
+
+  const checkMediaPermissions = async () => {
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setMediaReady(false);
+      setError('Your browser does not support camera access APIs.');
+      return false;
+    }
+
+    let cameraError = null;
+    let micError = null;
+    let cameraReady = false;
+
+    try {
+      const cameraStream = await navigator.mediaDevices.getUserMedia({ video: true });
+      cameraReady = cameraStream.getVideoTracks().length > 0;
+      cameraStream.getTracks().forEach((track) => track.stop());
+    } catch (permissionError) {
+      cameraError = permissionError;
+    }
+
+    try {
+      const micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      micStream.getTracks().forEach((track) => track.stop());
+    } catch (permissionError) {
+      micError = permissionError;
+    }
+
+    if (cameraReady) {
+      setMediaReady(true);
+      setError('');
+      return true;
+    }
+
+    {
+      setMediaReady(false);
+      setError(getMediaPermissionError(cameraError || micError));
+      return false;
+    }
+  };
+
+  const startTelemedicineCall = async (appointment) => {
+    const appointmentId = getAppointmentId(appointment);
+    if (!appointmentId) {
+      alert('Appointment ID not found. Please refresh and try again.');
+      return;
+    }
+
+    setError('');
+    const allowed = await checkMediaPermissions();
+    if (!allowed) return;
+
+    setActiveCall({
+      appointment,
+      roomName: `healthcare-appt-${appointmentId}`,
+    });
+  };
+
+  const endTelemedicineCall = () => {
+    setActiveCall(null);
+  };
+
+  const openPatientCallInNewTab = (roomName) => {
+    const patientName = userDetails?.firstName || currentUser?.name || 'Patient';
+    window.open(buildJitsiCallUrl(roomName, patientName), '_blank', 'noopener,noreferrer');
+  };
 
   useEffect(() => {
     if (!currentUser) {
@@ -42,6 +135,16 @@ const ProfilePage = ({ navigate, currentUser }) => {
           const appointmentsData = await appointmentsResponse.json();
           const appts = Array.isArray(appointmentsData) ? appointmentsData : appointmentsData.data || [];
           setAppointments(appts);
+        }
+
+        try {
+          const allPrescriptions = JSON.parse(localStorage.getItem(STORAGE_KEY_PRESCRIPTIONS) || '[]');
+          const mine = Array.isArray(allPrescriptions)
+            ? allPrescriptions.filter((item) => Number(item?.patientId) === Number(currentUser.userId))
+            : [];
+          setPrescriptions(mine);
+        } catch {
+          setPrescriptions([]);
         }
       } catch (err) {
         console.error('Error fetching data:', err);
@@ -153,9 +256,113 @@ const ProfilePage = ({ navigate, currentUser }) => {
           </div>
         </div>
 
+        {/* Prescriptions Section */}
+        <div className="mb-12">
+          <h2 className="text-2xl font-bold text-gray-900 mb-6">💊 My Prescriptions</h2>
+          {prescriptions.length === 0 ? (
+            <div className="bg-white rounded-lg p-6 shadow-md text-gray-500">
+              No prescriptions available for your patient account yet.
+            </div>
+          ) : (
+            <div className="grid gap-4">
+              {prescriptions.map((prescription) => (
+                <div
+                  key={prescription.id}
+                  className="bg-white rounded-lg p-6 shadow-md border-l-4 border-emerald-500"
+                >
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div>
+                      <p className="text-sm text-gray-500">Prescription ID</p>
+                      <p className="font-bold text-gray-800">{prescription.id}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm text-gray-500">Issued Date</p>
+                      <p className="font-semibold text-gray-700">
+                        {prescription.issuedAt
+                          ? new Date(prescription.issuedAt).toLocaleDateString('en-US')
+                          : 'N/A'}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="mt-4 grid gap-2 text-sm text-gray-700 sm:grid-cols-2">
+                    <p><span className="font-semibold">Doctor:</span> Dr. {prescription.doctorName || 'N/A'}</p>
+                    <p><span className="font-semibold">Appointment:</span> #{prescription.appointmentId || 'N/A'}</p>
+                    <p className="sm:col-span-2"><span className="font-semibold">Diagnosis:</span> {prescription.diagnosis || 'N/A'}</p>
+                    <div className="sm:col-span-2">
+                      <p className="font-semibold">Medicines:</p>
+                      {Array.isArray(prescription.medications) && prescription.medications.length > 0 ? (
+                        <ul className="mt-1 space-y-1 text-sm text-gray-600">
+                          {prescription.medications.map((m, i) => (
+                            <li key={`${prescription.id}-med-${i}`}>
+                              {m?.name || 'Medicine'} - {m?.dosage || 'N/A'}, {m?.frequency || 'N/A'}, {m?.duration || 'N/A'}
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p className="text-gray-500">No medicine entries.</p>
+                      )}
+                    </div>
+                    {prescription.notes ? (
+                      <p className="sm:col-span-2"><span className="font-semibold">Notes:</span> {prescription.notes}</p>
+                    ) : null}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
         {/* Appointments Section */}
         <div>
           <h2 className="text-2xl font-bold text-gray-900 mb-6">📋 My Appointments</h2>
+
+          {activeCall ? (
+            <div className="mb-6 rounded-2xl bg-white p-4 shadow-lg">
+              <div className="mb-3 flex items-center justify-between">
+                <div>
+                  <h3 className="text-lg font-bold text-gray-800">Telemedicine Session</h3>
+                  <p className="text-sm text-gray-500">
+                    Appointment #{getAppointmentId(activeCall.appointment)} with Dr. {activeCall.appointment?.doctorFirstName || ''} {activeCall.appointment?.doctorLastName || ''}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => openPatientCallInNewTab(activeCall.roomName)}
+                    className="rounded-lg bg-slate-700 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 transition"
+                  >
+                    Open In New Tab
+                  </button>
+                  <button
+                    onClick={endTelemedicineCall}
+                    className="rounded-lg bg-red-500 px-4 py-2 text-sm font-semibold text-white hover:bg-red-600 transition"
+                  >
+                    End Call
+                  </button>
+                </div>
+              </div>
+              <div className="overflow-hidden rounded-xl border" style={{ height: '520px' }}>
+                <iframe
+                  src={buildJitsiCallUrl(activeCall.roomName, userDetails?.firstName || currentUser?.name || 'Patient')}
+                  allow="camera *; microphone *; fullscreen *; display-capture *; autoplay *"
+                  className="h-full w-full border-0"
+                  title="Patient Video Consultation"
+                />
+              </div>
+              <p className="mt-2 text-xs text-gray-500">Room: {activeCall.roomName}</p>
+              <p className="mt-1 text-xs text-slate-500">Local device access: {mediaReady ? 'Camera/Mic ready' : 'Not verified for this session'}</p>
+              <p className="mt-1 text-xs text-amber-600">If camera is blocked in iframe, click Open In New Tab and allow camera/mic permission.</p>
+            </div>
+          ) : null}
+
+          <div className="mb-4">
+            <button
+              type="button"
+              onClick={checkMediaPermissions}
+              className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+            >
+              Enable Camera & Mic
+            </button>
+          </div>
 
           {appointments.length === 0 ? (
             <div className="bg-white rounded-lg p-8 shadow-md text-center">
@@ -258,7 +465,17 @@ const ProfilePage = ({ navigate, currentUser }) => {
                     >
                       📄 Download Slip
                     </button>
+                    <button
+                      onClick={() => startTelemedicineCall(appointment)}
+                      disabled={!canJoinTelemedicine(appointment)}
+                      className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition font-semibold text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      🎥 Join Call
+                    </button>
                   </div>
+                  {!canJoinTelemedicine(appointment) ? (
+                    <p className="mt-3 text-xs text-slate-500">Call is available when appointment status is CONFIRMED.</p>
+                  ) : null}
                 </div>
               ))}
             </div>
