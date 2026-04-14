@@ -3,7 +3,7 @@ import Navbar from "../components/navbar";
 import { sendAppointmentSuccessNotification } from "../lib/notifications";
 
 const PAYMENT_API_BASE_URL =
-  import.meta.env.VITE_PAYMENT_API_BASE_URL?.trim() || "http://localhost:8096";
+  import.meta.env.VITE_PAYMENT_API_BASE_URL?.trim() || "http://localhost:8086";
 const PAYHERE_SDK_URL = "https://www.payhere.lk/lib/payhere.js";
 
 const loadPayHereSdk = () => {

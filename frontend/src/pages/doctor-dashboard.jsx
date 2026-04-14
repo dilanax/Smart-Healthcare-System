@@ -73,6 +73,31 @@ const emptyPrescriptionForm = () => ({
   date: new Date().toISOString().slice(0, 10),
 });
 
+const buildJitsiCallUrl = (roomName, displayName) =>
+  `https://meet.jit.si/${encodeURIComponent(roomName)}#userInfo.displayName=${encodeURIComponent(displayName)}&config.startWithVideoMuted=false&config.startWithAudioMuted=false&config.prejoinPageEnabled=false`;
+
+const getMediaPermissionError = (error) => {
+  if (error?.name === 'NotAllowedError') {
+    return 'Camera/Microphone permission denied. Click the lock icon near URL and allow camera + microphone.';
+  }
+  if (error?.name === 'NotFoundError') {
+    return 'No camera device found on this computer (or camera is blocked).';
+  }
+  if (error?.name === 'NotReadableError') {
+    return 'Camera is busy in another app (Teams/Zoom/Camera). Close other apps and try again.';
+  }
+  return 'Unable to access camera/microphone on this browser.';
+};
+
+const splitName = (nameValue) => {
+  const full = String(nameValue || '').trim();
+  if (!full) return { firstName: '', lastName: '' };
+  const parts = full.split(/\s+/);
+  const firstName = parts.shift() || '';
+  const lastName = parts.join(' ');
+  return { firstName, lastName };
+};
+
 // ─── Sub-components ──────────────────────────────────────────────────────────
 const StatCard = ({ title, value, icon, color, note }) => (
   <div className="rounded-2xl bg-white p-6 shadow-lg">
@@ -144,9 +169,13 @@ const DoctorDashboard = ({ navigate, currentUser, refreshUser }) => {
 
   // Logout confirmation
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [mediaReady, setMediaReady] = useState(false);
 
-  const doctorUserId = currentUser?.userId;
-  const doctorName = `${currentUser?.firstName ?? ''} ${currentUser?.lastName ?? ''}`.trim() || 'Doctor';
+  const doctorUserId = Number(currentUser?.userId ?? currentUser?.id ?? 0);
+  const nameFromPayload = splitName(currentUser?.name);
+  const doctorFirstName = currentUser?.firstName ?? nameFromPayload.firstName;
+  const doctorLastName = currentUser?.lastName ?? nameFromPayload.lastName;
+  const doctorName = `${doctorFirstName ?? ''} ${doctorLastName ?? ''}`.trim() || 'Doctor';
 
   // ── Redirect if not doctor ──────────────────────────────────────────────
   useEffect(() => {
@@ -164,8 +193,13 @@ const DoctorDashboard = ({ navigate, currentUser, refreshUser }) => {
     if (!doctorUserId) return;
     setLoadingAppts(true);
     try {
-      const data = await fetch(`${APPOINTMENT_API}/api/appointments?doctorId=${doctorUserId}`).then((r) => r.json());
-      setAppointments(Array.isArray(data) ? data : []);
+      const response = await fetch(`${APPOINTMENT_API}/api/appointments?doctorId=${doctorUserId}`);
+      const data = await response.json();
+      const list = Array.isArray(data) ? data : data?.data || [];
+
+      // Guardrail: only keep appointments that belong to the logged-in doctor.
+      const myAppointments = list.filter((item) => Number(item?.doctorId) === Number(doctorUserId));
+      setAppointments(myAppointments);
     } catch {
       setAppointments([]);
     } finally {
@@ -186,15 +220,23 @@ const DoctorDashboard = ({ navigate, currentUser, refreshUser }) => {
           firstName: data.firstName ?? '',
           lastName: data.lastName ?? '',
           specialty: data.specialty ?? '',
+          specialization: data.specialization ?? data.specialty ?? '',
+          hospital: data.hospital ?? '',
+          email: data.email ?? currentUser?.email ?? '',
+          phoneNumber: data.phoneNumber ?? currentUser?.phoneNumber ?? '',
           experienceYears: data.experienceYears ?? 0,
         });
       } else {
         // Profile might not exist yet – seed from auth data
         setDoctorProfile(null);
         setProfileForm({
-          firstName: currentUser?.firstName ?? '',
-          lastName: currentUser?.lastName ?? '',
+          firstName: doctorFirstName ?? '',
+          lastName: doctorLastName ?? '',
           specialty: '',
+          specialization: '',
+          hospital: '',
+          email: currentUser?.email ?? '',
+          phoneNumber: currentUser?.phoneNumber ?? '',
           experienceYears: 0,
         });
       }
@@ -203,7 +245,7 @@ const DoctorDashboard = ({ navigate, currentUser, refreshUser }) => {
     } finally {
       setLoadingProfile(false);
     }
-  }, [doctorUserId, currentUser]);
+  }, [doctorUserId, currentUser, doctorFirstName, doctorLastName]);
 
   useEffect(() => {
     fetchAppointments();
@@ -258,6 +300,14 @@ const DoctorDashboard = ({ navigate, currentUser, refreshUser }) => {
       const body = {
         ...profileForm,
         userId: doctorUserId,
+        specialization: profileForm.specialization || profileForm.specialty || doctorProfile?.specialization || doctorProfile?.specialty || '',
+        specialty: profileForm.specialty || profileForm.specialization || doctorProfile?.specialty || doctorProfile?.specialization || '',
+        hospital: profileForm.hospital ?? doctorProfile?.hospital ?? '',
+        email: profileForm.email ?? doctorProfile?.email ?? currentUser?.email ?? '',
+        phoneNumber: profileForm.phoneNumber ?? doctorProfile?.phoneNumber ?? currentUser?.phoneNumber ?? '',
+        availability: doctorProfile?.availability ?? 'Available Today',
+        consultationFee: doctorProfile?.consultationFee ?? 0,
+        imageUrl: doctorProfile?.imageUrl ?? '',
         rating: doctorProfile?.rating ?? 0,
         patientCount: doctorProfile?.patientCount ?? 0,
       };
@@ -299,12 +349,65 @@ const DoctorDashboard = ({ navigate, currentUser, refreshUser }) => {
   };
 
   // ── Telemedicine ────────────────────────────────────────────────────────
-  const startVideoCall = (appt) => {
+  const checkMediaPermissions = useCallback(async () => {
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setMediaReady(false);
+      setError('Your browser does not support camera access APIs.');
+      return false;
+    }
+
+    let cameraError = null;
+    let micError = null;
+    let cameraReady = false;
+    let micReady = false;
+
+    try {
+      const cameraStream = await navigator.mediaDevices.getUserMedia({ video: true });
+      cameraReady = cameraStream.getVideoTracks().length > 0;
+      cameraStream.getTracks().forEach((track) => track.stop());
+    } catch (error) {
+      cameraError = error;
+    }
+
+    try {
+      const micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      micReady = micStream.getAudioTracks().length > 0;
+      micStream.getTracks().forEach((track) => track.stop());
+    } catch (error) {
+      micError = error;
+    }
+
+    if (cameraReady) {
+      setMediaReady(true);
+      setError('');
+      if (!micReady) {
+        setSuccess('Camera is ready. Microphone is unavailable/blocked. You can still join video and use chat.');
+      }
+      return true;
+    }
+
+    {
+      setMediaReady(false);
+      setError(getMediaPermissionError(cameraError || micError));
+      return false;
+    }
+  }, []);
+
+  const startVideoCall = async (appt) => {
+    setError('');
+    const allowed = await checkMediaPermissions();
+    if (!allowed) return;
+
     const roomName = `healthcare-appt-${appt.appointmentId}`;
     setActiveRoom({ roomName, appt });
   };
 
   const endCall = () => setActiveRoom(null);
+
+  const openCallInNewTab = (roomName) => {
+    const url = buildJitsiCallUrl(roomName, `Dr. ${doctorName}`);
+    window.open(url, '_blank', 'noopener,noreferrer');
+  };
 
   // ── Prescriptions ───────────────────────────────────────────────────────
   const addMedication = () =>
@@ -670,7 +773,8 @@ const DoctorDashboard = ({ navigate, currentUser, refreshUser }) => {
                     {(currentUser?.firstName?.[0] ?? 'D').toUpperCase()}
                   </div>
                   <h2 className="mt-4 text-lg font-bold text-gray-800">Dr. {doctorName}</h2>
-                  <p className="text-sm text-teal-600">{doctorProfile?.specialty || 'General Practitioner'}</p>
+                  <p className="text-sm text-teal-600">{doctorProfile?.specialization || doctorProfile?.specialty || 'General Practitioner'}</p>
+                  <p className="mt-1 text-xs text-gray-500">User ID: {doctorUserId || 'N/A'}</p>
                   <div className="mt-4 space-y-2 text-left text-sm text-gray-600">
                     <div className="flex gap-2">
                       <i className="fas fa-star text-yellow-400 mt-0.5" />
@@ -686,11 +790,11 @@ const DoctorDashboard = ({ navigate, currentUser, refreshUser }) => {
                     </div>
                     <div className="flex gap-2">
                       <i className="fas fa-envelope text-gray-400 mt-0.5" />
-                      {currentUser?.email || 'N/A'}
+                      {doctorProfile?.email || currentUser?.email || 'N/A'}
                     </div>
                     <div className="flex gap-2">
                       <i className="fas fa-phone text-gray-400 mt-0.5" />
-                      {currentUser?.phoneNumber || 'N/A'}
+                      {doctorProfile?.phoneNumber || currentUser?.phoneNumber || 'N/A'}
                     </div>
                   </div>
                 </div>
@@ -703,6 +807,10 @@ const DoctorDashboard = ({ navigate, currentUser, refreshUser }) => {
                       { key: 'firstName', label: 'First Name' },
                       { key: 'lastName', label: 'Last Name' },
                       { key: 'specialty', label: 'Specialty' },
+                      { key: 'specialization', label: 'Specialization' },
+                      { key: 'hospital', label: 'Hospital' },
+                      { key: 'email', label: 'Email' },
+                      { key: 'phoneNumber', label: 'Phone Number' },
                       { key: 'experienceYears', label: 'Years of Experience', type: 'number' },
                     ].map(({ key, label, type = 'text' }) => (
                       <div key={key}>
@@ -805,18 +913,26 @@ const DoctorDashboard = ({ navigate, currentUser, refreshUser }) => {
                       </h2>
                       <p className="text-sm text-gray-500">Patient #{activeRoom.appt.patientId}</p>
                     </div>
-                    <button
-                      onClick={endCall}
-                      className="flex items-center gap-2 rounded-xl bg-red-500 px-4 py-2 text-sm font-medium text-white hover:bg-red-600 transition"
-                    >
-                      <i className="fas fa-phone-slash" /> End Call
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => openCallInNewTab(activeRoom.roomName)}
+                        className="flex items-center gap-2 rounded-xl bg-slate-700 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 transition"
+                      >
+                        <i className="fas fa-up-right-from-square" /> Open In New Tab
+                      </button>
+                      <button
+                        onClick={endCall}
+                        className="flex items-center gap-2 rounded-xl bg-red-500 px-4 py-2 text-sm font-medium text-white hover:bg-red-600 transition"
+                      >
+                        <i className="fas fa-phone-slash" /> End Call
+                      </button>
+                    </div>
                   </div>
                   <div className="overflow-hidden rounded-2xl shadow-xl" style={{ height: '560px' }}>
                     <iframe
                       ref={jitsiRef}
-                      src={`https://meet.jit.si/${activeRoom.roomName}#userInfo.displayName=${encodeURIComponent('Dr. ' + doctorName)}&config.startWithVideoMuted=false&config.startWithAudioMuted=false`}
-                      allow="camera; microphone; fullscreen; display-capture"
+                      src={buildJitsiCallUrl(activeRoom.roomName, `Dr. ${doctorName}`)}
+                      allow="camera *; microphone *; fullscreen *; display-capture *; autoplay *"
                       className="h-full w-full border-0"
                       title="Video Consultation"
                     />
@@ -824,12 +940,27 @@ const DoctorDashboard = ({ navigate, currentUser, refreshUser }) => {
                   <p className="mt-2 text-xs text-gray-400">
                     Room: <span className="font-mono">{activeRoom.roomName}</span> — Share this room ID with your patient.
                   </p>
+                  <p className="mt-1 text-xs text-slate-500">
+                    Local device access: {mediaReady ? 'Camera/Mic ready' : 'Not verified for this session'}
+                  </p>
+                  <p className="mt-1 text-xs text-amber-600">
+                    If camera is blocked in iframe, click "Open In New Tab" and allow camera/mic in browser prompt.
+                  </p>
                 </div>
               ) : (
                 <div>
                   <div className="mb-4 rounded-2xl bg-teal-50 border border-teal-200 p-4 text-sm text-teal-700">
                     <i className="fas fa-info-circle mr-2" />
                     Video calls use Jitsi Meet — no installation required. Start a session to generate a meeting room for the patient.
+                  </div>
+                  <div className="mb-4">
+                    <button
+                      type="button"
+                      onClick={checkMediaPermissions}
+                      className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                    >
+                      Enable Camera & Mic
+                    </button>
                   </div>
 
                   {appointments.filter((a) => a.status === 'CONFIRMED').length === 0 ? (

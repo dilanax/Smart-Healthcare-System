@@ -14,7 +14,7 @@ import java.security.NoSuchAlgorithmException;
 import java.util.List;
 import java.util.Map;
 
-@CrossOrigin(origins = {"http://localhost:5173", "http://localhost:5174"})
+@CrossOrigin(originPatterns = "http://localhost:*")
 @RestController
 @RequestMapping("/payments")
 @RequiredArgsConstructor

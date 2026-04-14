@@ -80,6 +80,7 @@ const emptyDoctorProfileForm = {
   specialization: '',
   hospital: '',
   email: '',
+  loginPassword: '',
   phoneNumber: '',
   imageUrl: '',
   availability: 'Available Today',
@@ -95,6 +96,7 @@ const toDoctorProfileForm = (doctor) => ({
   specialization: doctor?.specialization ?? doctor?.specialty ?? '',
   hospital: doctor?.hospital ?? '',
   email: doctor?.email ?? '',
+  loginPassword: '',
   phoneNumber: doctor?.phoneNumber ?? '',
   imageUrl: doctor?.imageUrl ?? '',
   availability: doctor?.availability ?? 'Available Today',
@@ -103,6 +105,11 @@ const toDoctorProfileForm = (doctor) => ({
   experienceYears: String(doctor?.experienceYears ?? '5'),
   patientCount: String(doctor?.patientCount ?? '0'),
 });
+
+const generateDoctorPassword = () => {
+  const base = Math.random().toString(36).slice(-6);
+  return `Dr@${base}9A`;
+};
 
 const AdminDashboard = ({ navigate, currentUser, refreshUser }) => {
   const [activeTab, setActiveTab] = useState('overview');
@@ -298,6 +305,23 @@ const approvePayment = async (paymentId) => {
       return;
     }
 
+    const normalizedDoctorEmail = doctorProfileForm.email.trim().toLowerCase();
+    if (!normalizedDoctorEmail) {
+      const message = 'Doctor email is required.';
+      setDoctorProfileError(message);
+      setError(message);
+      setBusyId(null);
+      return;
+    }
+
+    if (!editingDoctorId && !doctorProfileForm.loginPassword.trim()) {
+      const message = 'Doctor login password is required for new doctor registration.';
+      setDoctorProfileError(message);
+      setError(message);
+      setBusyId(null);
+      return;
+    }
+
     try {
       let imageUrl = doctorProfileForm.imageUrl.trim();
 
@@ -308,13 +332,60 @@ const approvePayment = async (paymentId) => {
         setUploadingImage(false);
       }
 
+      let linkedDoctorUserId = editingDoctorId;
+
+      if (!editingDoctorId) {
+        if (!accessToken) {
+          throw new Error('Admin session expired. Please login again and try.');
+        }
+
+        const usersResponse = await fetchUsers(accessToken);
+        const refreshedUsers = Array.isArray(usersResponse?.data) ? usersResponse.data : [];
+        setUsers(refreshedUsers);
+
+        const existingUser = refreshedUsers.find(
+          (user) => user.email?.trim().toLowerCase() === normalizedDoctorEmail,
+        );
+
+        if (existingUser) {
+          if (existingUser.role !== 'DOCTOR') {
+            throw new Error('This email already belongs to a non-doctor account. Please use another email.');
+          }
+          linkedDoctorUserId = existingUser.userId;
+        } else {
+          await registerUser({
+            firstName: doctorProfileForm.firstName.trim(),
+            lastName: doctorProfileForm.lastName.trim(),
+            email: normalizedDoctorEmail,
+            phoneNumber: doctorProfileForm.phoneNumber.trim(),
+            password: doctorProfileForm.loginPassword,
+            role: 'DOCTOR',
+          });
+
+          const latestUsersResponse = await fetchUsers(accessToken);
+          const latestUsers = Array.isArray(latestUsersResponse?.data) ? latestUsersResponse.data : [];
+          setUsers(latestUsers);
+
+          const registeredDoctorUser = latestUsers.find(
+            (user) => user.email?.trim().toLowerCase() === normalizedDoctorEmail,
+          );
+
+          if (!registeredDoctorUser) {
+            throw new Error('Doctor login account was created, but user linking failed. Please refresh and try again.');
+          }
+
+          linkedDoctorUserId = registeredDoctorUser.userId;
+        }
+      }
+
       const payload = {
+        userId: Number(linkedDoctorUserId),
         firstName: doctorProfileForm.firstName.trim(),
         lastName: doctorProfileForm.lastName.trim(),
         specialty: doctorProfileForm.specialization.trim(),
         specialization: doctorProfileForm.specialization.trim(),
         hospital: doctorProfileForm.hospital.trim(),
-        email: doctorProfileForm.email.trim().toLowerCase(),
+        email: normalizedDoctorEmail,
         phoneNumber: doctorProfileForm.phoneNumber.trim(),
         imageUrl: imageUrl,
         availability: doctorProfileForm.availability,
@@ -981,7 +1052,8 @@ const approvePayment = async (paymentId) => {
                     <input name="lastName" value={doctorProfileForm.lastName} onChange={handleDoctorProfileChange} placeholder="Last name" className="rounded-lg border px-4 py-2 outline-none focus:ring-2 focus:ring-teal-300" />
                     <input name="specialization" value={doctorProfileForm.specialization} onChange={handleDoctorProfileChange} placeholder="Specialization" className="rounded-lg border px-4 py-2 outline-none focus:ring-2 focus:ring-teal-300" />
                     <input name="hospital" value={doctorProfileForm.hospital} onChange={handleDoctorProfileChange} placeholder="Hospital" className="rounded-lg border px-4 py-2 outline-none focus:ring-2 focus:ring-teal-300" />
-                    <input name="email" value={doctorProfileForm.email} onChange={handleDoctorProfileChange} placeholder="Email" className="rounded-lg border px-4 py-2 outline-none focus:ring-2 focus:ring-teal-300" />
+                    <input name="email" type="email" value={doctorProfileForm.email} onChange={handleDoctorProfileChange} placeholder="Doctor login email" className="rounded-lg border px-4 py-2 outline-none focus:ring-2 focus:ring-teal-300" />
+                    {!editingDoctorId ? <div className="space-y-2"><input name="loginPassword" type="text" value={doctorProfileForm.loginPassword} onChange={handleDoctorProfileChange} placeholder="Doctor login password" className="w-full rounded-lg border px-4 py-2 outline-none focus:ring-2 focus:ring-teal-300" /><div className="flex items-center justify-between gap-2"><p className="text-xs text-slate-500">Use at least 8 chars with A-Z, a-z, number and symbol.</p><button type="button" onClick={() => setDoctorProfileForm((prev) => ({ ...prev, loginPassword: generateDoctorPassword() }))} className="rounded-md border border-teal-300 px-3 py-1 text-xs font-semibold text-teal-700 hover:bg-teal-50">Auto Generate</button></div></div> : null}
                     <input name="phoneNumber" value={doctorProfileForm.phoneNumber} onChange={handleDoctorProfileChange} placeholder="Phone number" className="rounded-lg border px-4 py-2 outline-none focus:ring-2 focus:ring-teal-300" />
                     <div className="col-span-1 md:col-span-2">
                       <label className="mb-2 block text-sm font-semibold text-gray-700">Doctor Image</label>

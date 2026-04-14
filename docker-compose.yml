@@ -140,6 +140,8 @@ services:
       SPRING_DATASOURCE_USERNAME: healthcare
       SPRING_DATASOURCE_PASSWORD: 123456
       SERVER_PORT: 8086
+      PAYHERE_MERCHANT_ID: "1235016"
+      PAYHERE_MERCHANT_SECRET: MTA3ODk5Njg4MzM2Mzk1OTcwNjkzMDkyMzE5NTUyMTA2NzQ5OTk2
     ports:
       - "8086:8086"
     depends_on:
@@ -160,6 +162,7 @@ services:
     environment:
       VITE_API_BASE_URL: http://localhost:8081
       VITE_NOTIFICATION_API_BASE_URL: http://localhost:8084
+      VITE_PAYMENT_API_BASE_URL: http://localhost:8086
     depends_on:
       - auth-service
       - doctor-service
