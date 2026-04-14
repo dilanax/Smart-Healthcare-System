@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import Navbar from '../components/navbar';
 
+const STORAGE_KEY_PRESCRIPTIONS = 'doctor_prescriptions';
+
 const buildJitsiCallUrl = (roomName, displayName) =>
   `https://meet.jit.si/${encodeURIComponent(roomName)}#userInfo.displayName=${encodeURIComponent(displayName)}&config.startWithVideoMuted=false&config.startWithAudioMuted=false&config.prejoinPageEnabled=false`;
 
@@ -20,6 +22,7 @@ const getMediaPermissionError = (error) => {
 const ProfilePage = ({ navigate, currentUser }) => {
   const [userDetails, setUserDetails] = useState(null);
   const [appointments, setAppointments] = useState([]);
+  const [prescriptions, setPrescriptions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [activeCall, setActiveCall] = useState(null);
@@ -133,6 +136,16 @@ const ProfilePage = ({ navigate, currentUser }) => {
           const appts = Array.isArray(appointmentsData) ? appointmentsData : appointmentsData.data || [];
           setAppointments(appts);
         }
+
+        try {
+          const allPrescriptions = JSON.parse(localStorage.getItem(STORAGE_KEY_PRESCRIPTIONS) || '[]');
+          const mine = Array.isArray(allPrescriptions)
+            ? allPrescriptions.filter((item) => Number(item?.patientId) === Number(currentUser.userId))
+            : [];
+          setPrescriptions(mine);
+        } catch {
+          setPrescriptions([]);
+        }
       } catch (err) {
         console.error('Error fetching data:', err);
         setError('Some data could not be loaded, but your profile is still available');
@@ -241,6 +254,62 @@ const ProfilePage = ({ navigate, currentUser }) => {
               </p>
             </div>
           </div>
+        </div>
+
+        {/* Prescriptions Section */}
+        <div className="mb-12">
+          <h2 className="text-2xl font-bold text-gray-900 mb-6">💊 My Prescriptions</h2>
+          {prescriptions.length === 0 ? (
+            <div className="bg-white rounded-lg p-6 shadow-md text-gray-500">
+              No prescriptions available for your patient account yet.
+            </div>
+          ) : (
+            <div className="grid gap-4">
+              {prescriptions.map((prescription) => (
+                <div
+                  key={prescription.id}
+                  className="bg-white rounded-lg p-6 shadow-md border-l-4 border-emerald-500"
+                >
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div>
+                      <p className="text-sm text-gray-500">Prescription ID</p>
+                      <p className="font-bold text-gray-800">{prescription.id}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm text-gray-500">Issued Date</p>
+                      <p className="font-semibold text-gray-700">
+                        {prescription.issuedAt
+                          ? new Date(prescription.issuedAt).toLocaleDateString('en-US')
+                          : 'N/A'}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="mt-4 grid gap-2 text-sm text-gray-700 sm:grid-cols-2">
+                    <p><span className="font-semibold">Doctor:</span> Dr. {prescription.doctorName || 'N/A'}</p>
+                    <p><span className="font-semibold">Appointment:</span> #{prescription.appointmentId || 'N/A'}</p>
+                    <p className="sm:col-span-2"><span className="font-semibold">Diagnosis:</span> {prescription.diagnosis || 'N/A'}</p>
+                    <div className="sm:col-span-2">
+                      <p className="font-semibold">Medicines:</p>
+                      {Array.isArray(prescription.medications) && prescription.medications.length > 0 ? (
+                        <ul className="mt-1 space-y-1 text-sm text-gray-600">
+                          {prescription.medications.map((m, i) => (
+                            <li key={`${prescription.id}-med-${i}`}>
+                              {m?.name || 'Medicine'} - {m?.dosage || 'N/A'}, {m?.frequency || 'N/A'}, {m?.duration || 'N/A'}
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p className="text-gray-500">No medicine entries.</p>
+                      )}
+                    </div>
+                    {prescription.notes ? (
+                      <p className="sm:col-span-2"><span className="font-semibold">Notes:</span> {prescription.notes}</p>
+                    ) : null}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Appointments Section */}

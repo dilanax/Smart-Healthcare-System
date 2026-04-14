@@ -5,7 +5,7 @@ import React, { useState, useEffect, useRef } from 'react';
 // Add your own video URLs (MP4 format recommended)
 const heroVideos = [
   {
-    url: "https://player.vimeo.com/external/434045526.sd.mp4?s=c27ecc553d2235c5e278fa9f06d7a7e2831376f4&profile_id=164&oauth2_token_id=57447761",
+    url: "https://assets.mixkit.co/videos/preview/mixkit-team-of-doctors-walking-through-a-hospital-1728-large.mp4",
     title: "Modern Medical Facility",
     subtitle: "State-of-the-art equipment",
     type: "video"
@@ -23,7 +23,7 @@ const heroVideos = [
     type: "video"
   },
   {
-    url: "https://cdn.pixabay.com/video/2023/03/27/157652-815485416_large.mp4",
+    url: "https://assets.mixkit.co/videos/preview/mixkit-doctor-using-a-tablet-in-a-hospital-5325-large.mp4",
     title: "Modern Healthcare",
     subtitle: "Patient-centered approach",
     type: "video"

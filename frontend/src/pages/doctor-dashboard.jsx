@@ -98,6 +98,11 @@ const splitName = (nameValue) => {
   return { firstName, lastName };
 };
 
+const asNumber = (value) => {
+  const num = Number(value);
+  return Number.isFinite(num) ? num : null;
+};
+
 // ─── Sub-components ──────────────────────────────────────────────────────────
 const StatCard = ({ title, value, icon, color, note }) => (
   <div className="rounded-2xl bg-white p-6 shadow-lg">
@@ -429,14 +434,42 @@ const DoctorDashboard = ({ navigate, currentUser, refreshUser }) => {
     }));
 
   const issuePrescription = () => {
+    if (!prescForm.appointmentId) {
+      setError('Select an appointment to link this prescription to a unique patient.');
+      return;
+    }
+
+    const apptId = asNumber(prescForm.appointmentId);
+    const selectedAppointment = appointments.find((a) => Number(a.appointmentId) === apptId);
+    if (!selectedAppointment) {
+      setError('Selected appointment is not valid for this doctor.');
+      return;
+    }
+
+    const linkedPatientId = asNumber(selectedAppointment.patientId);
+    const enteredPatientId = asNumber(prescForm.patientId);
+    if (!linkedPatientId) {
+      setError('Selected appointment does not have a valid patient ID.');
+      return;
+    }
+
+    if (enteredPatientId && enteredPatientId !== linkedPatientId) {
+      setError('Patient ID must match the selected appointment patient.');
+      return;
+    }
+
     if (!prescForm.patientName || !prescForm.diagnosis) {
       setError('Patient name and diagnosis are required.');
       return;
     }
+
     const newPresc = {
       ...prescForm,
       id: `RX-${Date.now()}`,
+      patientId: linkedPatientId,
+      appointmentId: apptId,
       doctorName,
+      doctorId: doctorUserId,
       specialty: doctorProfile?.specialty ?? '',
       issuedAt: new Date().toISOString(),
     };
@@ -1089,10 +1122,25 @@ const DoctorDashboard = ({ navigate, currentUser, refreshUser }) => {
                       <label className="mb-1 block text-sm font-semibold text-gray-700">Appointment ID</label>
                       <select
                         value={prescForm.appointmentId}
-                        onChange={(e) => setPrescForm((p) => ({ ...p, appointmentId: e.target.value }))}
+                        onChange={(e) =>
+                          setPrescForm((p) => {
+                            const appointmentId = e.target.value;
+                            const selectedAppointment = appointments.find(
+                              (a) => String(a.appointmentId) === String(appointmentId)
+                            );
+                            if (!selectedAppointment) return { ...p, appointmentId };
+                            return {
+                              ...p,
+                              appointmentId,
+                              patientId: String(selectedAppointment.patientId ?? ''),
+                              patientName:
+                                p.patientName || `Patient #${selectedAppointment.patientId ?? ''}`,
+                            };
+                          })
+                        }
                         className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2 text-sm outline-none focus:border-teal-500 focus:bg-white"
                       >
-                        <option value="">— Select appointment (optional) —</option>
+                        <option value="">— Select appointment (required) —</option>
                         {appointments
                           .filter((a) => ['CONFIRMED', 'COMPLETED'].includes(a.status))
                           .map((a) => (
