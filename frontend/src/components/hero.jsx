@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion'; // Added Framer Motion
 /* ─── VIDEO OPTIONS (EASILY MANAGABLE) ─── */
 const heroVideos = [
   {
-    url: "https://assets.mixkit.co/videos/preview/mixkit-team-of-doctors-walking-through-a-hospital-1728-large.mp4",
+    url: "https://player.vimeo.com/external/434045526.sd.mp4?s=c27ecc553d2235c5e278fa9f06d7a7e2831376f4&profile_id=164&oauth2_token_id=57447761",
     title: "Modern Medical Facility",
     subtitle: "State-of-the-art equipment",
     type: "video"
@@ -47,11 +47,11 @@ const services = [
   { icon: "🔬", title: "Lab Diagnostics", desc: "Fast and accurate diagnostics", patients: "25,000+", doctors: "12+", color: "#805ad5" },
 ];
 
-const fallbackDoctors = [
-  { userId: 1, firstName: "Sarah", lastName: "Johnson", specialty: "Cardiologist", imageUrl: "https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=400&q=80", rating: 4.9, experienceYears: 15, patientCount: 5200, availability: "Available Today" },
-  { userId: 2, firstName: "Michael", lastName: "Chen", specialty: "Neurologist", imageUrl: "https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?w=400&q=80", rating: 4.8, experienceYears: 12, patientCount: 3800, availability: "Available Tomorrow" },
-  { userId: 3, firstName: "Emily", lastName: "Rodriguez", specialty: "Pediatrician", imageUrl: "https://images.unsplash.com/photo-1594824476967-48c8b964273f?w=400&q=80", rating: 5.0, experienceYears: 10, patientCount: 4500, availability: "Available Today" },
-  { userId: 4, firstName: "James", lastName: "Wilson", specialty: "Orthopedic Surgeon", imageUrl: "https://images.unsplash.com/photo-1622253692010-333f2da6031d?w=400&q=80", rating: 4.9, experienceYears: 18, patientCount: 6100, availability: "Available Today" },
+const doctors = [
+  { name: "Dr. Sarah Johnson", specialty: "Cardiologist", img: "https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=400&q=80", rating: 4.9, experience: "15 yrs", patients: "5,200+", availability: "Available Today" },
+  { name: "Dr. Michael Chen", specialty: "Neurologist", img: "https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?w=400&q=80", rating: 4.8, experience: "12 yrs", patients: "3,800+", availability: "Available Tomorrow" },
+  { name: "Dr. Emily Rodriguez", specialty: "Pediatrician", img: "https://images.unsplash.com/photo-1594824476967-48c8b964273f?w=400&q=80", rating: 5.0, experience: "10 yrs", patients: "4,500+", availability: "Available Today" },
+  { name: "Dr. James Wilson", specialty: "Orthopedic Surgeon", img: "https://images.unsplash.com/photo-1622253692010-333f2da6031d?w=400&q=80", rating: 4.9, experience: "18 yrs", patients: "6,100+", availability: "Available Today" },
 ];
 
 const testimonials = [
@@ -83,7 +83,6 @@ const Hero = ({ navigate, currentUser }) => {
   const [isVideoLoading, setIsVideoLoading] = useState(true);
   const [videoError, setVideoError] = useState(false);
   const [isPlaying, setIsPlaying] = useState(true);
-  const [doctorProfiles, setDoctorProfiles] = useState(fallbackDoctors);
   const statsRef = useRef(null);
   const videoRef = useRef(null);
   const slideInterval = useRef(null);
@@ -101,24 +100,6 @@ const Hero = ({ navigate, currentUser }) => {
       setVideoError(false);
     }, 8000);
     return () => clearInterval(slideInterval.current);
-  }, []);
-
-  useEffect(() => {
-    const loadDoctorProfiles = async () => {
-      try {
-        const response = await fetch('http://localhost:8082/api/doctors');
-        if (!response.ok) return;
-        const data = await response.json();
-        const list = Array.isArray(data) ? data : [];
-        if (list.length > 0) {
-          setDoctorProfiles(list);
-        }
-      } catch {
-        // Keep fallback cards when doctor service is unavailable.
-      }
-    };
-
-    loadDoctorProfiles();
   }, []);
 
   // Video load handlers
@@ -424,27 +405,27 @@ const Hero = ({ navigate, currentUser }) => {
             <h2 className="text-4xl font-black mt-6 text-[#1a202c]">Meet Our Specialist Doctors</h2>
             <p className="text-[#64748b] mt-4 font-medium">Our board-certified doctors bring years of experience and compassion</p>
           </div>
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {doctorProfiles.map((doctor, idx) => (
-              <div key={idx} className="bg-white rounded-xl shadow-md overflow-hidden hover-scale transition-all">
-                <div className="relative h-64 overflow-hidden">
-                  <img src={doctor.imageUrl || `https://i.pravatar.cc/400?u=${doctor.userId}`} alt={`Dr. ${doctor.firstName} ${doctor.lastName}`} className="w-full h-full object-cover hover:scale-110 transition duration-500" />
-                  <div className={`absolute top-3 right-3 text-xs px-2 py-1 rounded-full ${
-                    (doctor.availability || 'Available Today') === 'Available Today' ? 'bg-green-500 text-white' : 'bg-yellow-500 text-white'
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
+            {doctors.map((doctor, idx) => (
+              <motion.div key={idx} whileHover={{ y: -8 }} className="bg-white rounded-3xl border border-gray-100 overflow-hidden group">
+                <div className="relative h-72 overflow-hidden bg-gray-100">
+                  <img src={doctor.img} alt={doctor.name} className="w-full h-full object-cover group-hover:scale-110 transition duration-700" />
+                  <div className={`absolute top-4 right-4 text-xs font-bold px-3 py-1.5 rounded-full shadow-md ${
+                    doctor.availability === 'Available Today' ? 'bg-[#14b8a6] text-white' : 'bg-[#d69e2e] text-white'
                   }`}>
-                    {doctor.availability || 'Available Today'}
+                    {doctor.availability}
                   </div>
                 </div>
-                <div className="p-4">
-                  <h3 className="font-bold text-gray-800">Dr. {doctor.firstName} {doctor.lastName}</h3>
-                  <p className="text-teal-600 text-sm font-medium">{doctor.specialization || doctor.specialty || 'General Medicine'}</p>
-                  <div className="flex justify-between text-xs text-gray-500 mt-2">
-                    <span>💼 {doctor.experienceYears || 0} yrs</span>
-                    <span>👥 {(doctor.patientCount || 0).toLocaleString()}+</span>
+                <div className="p-6">
+                  <h3 className="font-black text-[#1a202c] text-lg">{doctor.name}</h3>
+                  <p className="text-[#14b8a6] text-sm font-bold mt-1">{doctor.specialty}</p>
+                  <div className="flex justify-between text-xs text-[#64748b] font-semibold mt-4 bg-gray-50 p-3 rounded-xl">
+                    <span className="flex items-center gap-1">💼 {doctor.experience}</span>
+                    <span className="flex items-center gap-1">👥 {doctor.patients}</span>
                   </div>
                   <div className="flex items-center gap-1 mt-4">
                     {[...Array(5)].map((_, i) => (
-                      <i key={i} className={`fas fa-star text-xs ${i < Math.round(doctor.rating || 0) ? 'text-yellow-400' : 'text-gray-300'}`}></i>
+                      <i key={i} className={`fas fa-star text-xs ${i < doctor.rating ? 'text-yellow-400' : 'text-gray-200'}`}></i>
                     ))}
                     <span className="text-xs font-bold text-[#64748b] ml-1">({doctor.rating})</span>
                   </div>
@@ -452,7 +433,7 @@ const Hero = ({ navigate, currentUser }) => {
                     whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
                     onClick={() => {
                       if (currentUser) {
-                        navigate(`/appointment?doctor=${encodeURIComponent(`${doctor.firstName} ${doctor.lastName}`)}`);
+                        navigate(`/appointment?doctor=${encodeURIComponent(doctor.name)}`);
                       } else {
                         navigate('/login');
                       }
