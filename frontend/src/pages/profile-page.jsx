@@ -1,21 +1,18 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Navbar from '../components/navbar';
+import { toast, Toaster } from 'react-hot-toast';
+import { motion, AnimatePresence } from 'framer-motion';
 
 const STORAGE_KEY_PRESCRIPTIONS = 'doctor_prescriptions';
 
+// --- Telemedicine Helpers ---
 const buildJitsiCallUrl = (roomName, displayName) =>
   `https://meet.jit.si/${encodeURIComponent(roomName)}#userInfo.displayName=${encodeURIComponent(displayName)}&config.startWithVideoMuted=false&config.startWithAudioMuted=false&config.prejoinPageEnabled=false`;
 
 const getMediaPermissionError = (error) => {
-  if (error?.name === 'NotAllowedError') {
-    return 'Camera/Microphone permission denied. Click the lock icon near URL and allow camera + microphone.';
-  }
-  if (error?.name === 'NotFoundError') {
-    return 'No camera device found on this computer (or camera is blocked).';
-  }
-  if (error?.name === 'NotReadableError') {
-    return 'Camera is busy in another app (Teams/Zoom/Camera). Close other apps and try again.';
-  }
+  if (error?.name === 'NotAllowedError') return 'Camera/Microphone permission denied. Click the lock icon near URL and allow camera + microphone.';
+  if (error?.name === 'NotFoundError') return 'No camera device found on this computer.';
+  if (error?.name === 'NotReadableError') return 'Camera is busy in another app. Close other apps and try again.';
   return 'Unable to access camera/microphone on this browser.';
 };
 
@@ -25,475 +22,478 @@ const ProfilePage = ({ navigate, currentUser }) => {
   const [prescriptions, setPrescriptions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  
+  // Telemedicine State
   const [activeCall, setActiveCall] = useState(null);
   const [mediaReady, setMediaReady] = useState(false);
 
+  // Avatar State & Refs
+  const avatarUploadRef = useRef(null);
+  const [profilePicUrl, setProfilePicUrl] = useState('');
+
+  // Tabs & Edit State
+  const [activeTab, setActiveTab] = useState('appointments'); 
+  const [isEditing, setIsEditing] = useState(false);
+  const [editForm, setEditForm] = useState({
+    firstName: '', lastName: '', phoneNumber: '', age: '', gender: ''
+  });
+
+  const getCleanToken = () => {
+    let token = localStorage.getItem('healthcare_auth_token');
+    return token ? token.replace(/^["']|["']$/g, '') : null;
+  };
+
   const getAppointmentId = (appointment) => appointment?.appointmentId ?? appointment?.id;
-
-  const canJoinTelemedicine = (appointment) => {
-    const status = String(appointment?.status || '').toUpperCase();
-    return status === 'CONFIRMED';
-  };
-
-  const checkMediaPermissions = async () => {
-    if (!navigator.mediaDevices?.getUserMedia) {
-      setMediaReady(false);
-      setError('Your browser does not support camera access APIs.');
-      return false;
-    }
-
-    let cameraError = null;
-    let micError = null;
-    let cameraReady = false;
-
-    try {
-      const cameraStream = await navigator.mediaDevices.getUserMedia({ video: true });
-      cameraReady = cameraStream.getVideoTracks().length > 0;
-      cameraStream.getTracks().forEach((track) => track.stop());
-    } catch (permissionError) {
-      cameraError = permissionError;
-    }
-
-    try {
-      const micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      micStream.getTracks().forEach((track) => track.stop());
-    } catch (permissionError) {
-      micError = permissionError;
-    }
-
-    if (cameraReady) {
-      setMediaReady(true);
-      setError('');
-      return true;
-    }
-
-    {
-      setMediaReady(false);
-      setError(getMediaPermissionError(cameraError || micError));
-      return false;
-    }
-  };
-
-  const startTelemedicineCall = async (appointment) => {
-    const appointmentId = getAppointmentId(appointment);
-    if (!appointmentId) {
-      alert('Appointment ID not found. Please refresh and try again.');
-      return;
-    }
-
-    setError('');
-    const allowed = await checkMediaPermissions();
-    if (!allowed) return;
-
-    setActiveCall({
-      appointment,
-      roomName: `healthcare-appt-${appointmentId}`,
-    });
-  };
-
-  const endTelemedicineCall = () => {
-    setActiveCall(null);
-  };
-
-  const openPatientCallInNewTab = (roomName) => {
-    const patientName = userDetails?.firstName || currentUser?.name || 'Patient';
-    window.open(buildJitsiCallUrl(roomName, patientName), '_blank', 'noopener,noreferrer');
-  };
+  const canJoinTelemedicine = (appointment) => String(appointment?.status || '').toUpperCase() === 'CONFIRMED';
 
   useEffect(() => {
     if (!currentUser) {
       navigate('/login');
       return;
     }
+    fetchData();
+  }, [currentUser, navigate]);
 
-    const fetchUserAndAppointments = async () => {
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      setError('');
+      const token = getCleanToken();
+      const actualUserId = currentUser?.userId;
+
+      // 1. Fetch Secure Profile Picture
       try {
-        setLoading(true);
-        setError('');
+          const picRes = await fetch(`http://localhost:8083/api/patients/profile/${actualUserId}/picture`, {
+              method: 'GET',
+              headers: { 'Authorization': `Bearer ${token}` }
+          });
+          if (picRes.ok) {
+              const blob = await picRes.blob();
+              if (blob.size > 0) setProfilePicUrl(URL.createObjectURL(blob));
+          }
+      } catch (e) { console.warn("Could not fetch profile picture."); }
 
-        // Fetch user details from Auth Service
-        const userResponse = await fetch(`http://localhost:8081/api/auth/user/${currentUser.userId}`, {
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('healthcare_auth_token')}`,
-            'Content-Type': 'application/json',
-          },
+      // 2. Fetch User Details (Port 8081)
+      try {
+        const userResponse = await fetch(`http://localhost:8081/api/auth/user/${actualUserId}`, {
+          headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
         });
-
         if (userResponse.ok) {
           const userData = await userResponse.json();
-          // Handle both direct user data and wrapped response
           const user = userData.data || userData;
           setUserDetails(user);
         }
+      } catch (e) { console.warn("Auth Service offline."); }
 
-        // Fetch appointments from Appointment Service
-        const appointmentsResponse = await fetch(
-          `http://localhost:8085/api/appointments?patientId=${currentUser.userId}`
-        );
-
-        if (appointmentsResponse.ok) {
-          const appointmentsData = await appointmentsResponse.json();
-          const appts = Array.isArray(appointmentsData) ? appointmentsData : appointmentsData.data || [];
-          setAppointments(appts);
+      // 3. Fetch Appointments (Port 8085)
+      try {
+        const apptRes = await fetch(`http://localhost:8085/api/appointments?patientId=${actualUserId}`);
+        if (apptRes.ok) {
+          const apptsData = await apptRes.json();
+          setAppointments(Array.isArray(apptsData) ? apptsData : apptsData.data || []);
         }
+      } catch (e) { console.warn("Appointment Service offline."); }
 
-        try {
-          const allPrescriptions = JSON.parse(localStorage.getItem(STORAGE_KEY_PRESCRIPTIONS) || '[]');
-          const mine = Array.isArray(allPrescriptions)
-            ? allPrescriptions.filter((item) => Number(item?.patientId) === Number(currentUser.userId))
-            : [];
-          setPrescriptions(mine);
-        } catch {
-          setPrescriptions([]);
-        }
-      } catch (err) {
-        console.error('Error fetching data:', err);
-        setError('Some data could not be loaded, but your profile is still available');
-      } finally {
-        setLoading(false);
+      // 4. Fetch Local Prescriptions
+      try {
+        const allPrescriptions = JSON.parse(localStorage.getItem(STORAGE_KEY_PRESCRIPTIONS) || '[]');
+        const mine = Array.isArray(allPrescriptions)
+          ? allPrescriptions.filter((item) => Number(item?.patientId) === Number(actualUserId))
+          : [];
+        setPrescriptions(mine);
+      } catch { setPrescriptions([]); }
+
+    } catch (err) {
+      setError('Some data could not be loaded, but your profile is still available.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // --- Avatar Upload Logic ---
+  const handleAvatarClick = () => {
+    if (avatarUploadRef.current) avatarUploadRef.current.click();
+  };
+
+  const handleProfilePicUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    setProfilePicUrl(URL.createObjectURL(file));
+
+    const token = getCleanToken();
+    const actualUserId = currentUser?.userId;
+    const toastId = toast.loading("Saving picture...");
+
+    const formData = new FormData();
+    formData.append("file", file);
+
+    try {
+      const res = await fetch(`http://localhost:8083/api/patients/profile/${actualUserId}/picture`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` },
+        body: formData
+      });
+
+      if (res.ok) {
+        toast.success("Profile picture updated!", { id: toastId });
+      } else {
+        toast.error("Failed to save to database.", { id: toastId });
       }
+    } catch (err) {
+      toast.error("Network error during upload.", { id: toastId });
+    }
+  };
+
+  // --- Profile Edit Logic ---
+  const handleUpdateProfile = async (e) => {
+    e.preventDefault();
+    const token = getCleanToken();
+    const actualUserId = currentUser?.userId;
+    const toastId = toast.loading("Saving personal details...");
+
+    const cleanPayload = {
+      ...editForm,
+      age: editForm.age === '' || editForm.age === null ? null : parseInt(editForm.age, 10)
     };
 
-    fetchUserAndAppointments();
-  }, [currentUser, navigate]);
+    try {
+      const res = await fetch(`http://localhost:8081/api/auth/user/${actualUserId}`, {
+        method: 'PUT',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(cleanPayload)
+      });
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50">
-        <Navbar navigate={navigate} currentUser={currentUser} />
-        <div className="flex items-center justify-center h-96">
-          <div className="text-center">
-            <div className="text-4xl mb-4">⏳</div>
-            <p className="text-gray-600">Loading your profile...</p>
-          </div>
-        </div>
+      const resData = await res.json();
+      if (res.ok) {
+        toast.success("Profile updated successfully!", { id: toastId });
+        setIsEditing(false); // Close the form
+        fetchData(); // Refresh data to show new details
+      } else {
+        toast.error(resData.message || "Failed to update profile.", { id: toastId });
+      }
+    } catch (err) {
+      toast.error("Network error.", { id: toastId });
+    }
+  };
+
+  // --- Telemedicine Logic ---
+  const checkMediaPermissions = async () => {
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setMediaReady(false);
+      toast.error('Browser does not support camera API.');
+      return false;
+    }
+    try {
+      const cameraStream = await navigator.mediaDevices.getUserMedia({ video: true });
+      cameraStream.getTracks().forEach((track) => track.stop());
+      setMediaReady(true);
+      return true;
+    } catch (err) {
+      setMediaReady(false);
+      toast.error(getMediaPermissionError(err));
+      return false;
+    }
+  };
+
+  const startTelemedicineCall = async (appointment) => {
+    const appointmentId = getAppointmentId(appointment);
+    if (!appointmentId) return toast.error('Appointment ID missing.');
+    const allowed = await checkMediaPermissions();
+    if (!allowed) return;
+    setActiveCall({ appointment, roomName: `healthcare-appt-${appointmentId}` });
+  };
+
+  if (loading) return (
+    <div className="min-h-screen bg-slate-50 flex flex-col">
+      <Navbar navigate={navigate} currentUser={currentUser} />
+      <div className="flex-1 flex items-center justify-center">
+        <div className="w-12 h-12 border-4 border-teal-200 border-t-teal-600 rounded-full animate-spin" />
       </div>
-    );
-  }
-
-  if (!currentUser) {
-    return null;
-  }
+    </div>
+  );
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-slate-50 font-sans pb-20">
+      <Toaster position="top-right" />
       <Navbar navigate={navigate} currentUser={currentUser} />
 
-      <div className="mx-auto max-w-6xl px-4 py-12 sm:px-6 lg:px-8">
+      {/* Teal Banner Background */}
+      <div className="h-64 bg-gradient-to-r from-teal-600 to-cyan-600 w-full absolute top-0 left-0 z-0" />
+
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 pt-28">
         {error && (
-          <div className="mb-6 rounded-lg bg-red-50 p-4 border-l-4 border-red-500">
-            <p className="text-red-800">⚠️ {error}</p>
+          <div className="mb-6 bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded shadow-sm">
+            {error}
           </div>
         )}
 
-        {/* User Details Section */}
-        <div className="mb-12">
-          <h1 className="text-4xl font-bold text-gray-900 mb-8">👤 My Profile</h1>
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+          
+          {/* ================= LEFT COLUMN: PROFILE CARD ================= */}
+          <div className="lg:col-span-4">
+            <div className="bg-white rounded-3xl p-8 shadow-xl border border-slate-100 text-center">
+              
+              <div className="relative inline-block mb-6">
+                <div className="w-40 h-40 rounded-full border-4 border-white shadow-xl bg-slate-100 overflow-hidden mx-auto">
+                  <img 
+                    src={profilePicUrl || `https://ui-avatars.com/api/?name=${userDetails?.firstName || 'User'}&background=14b8a6&color=fff&size=200`} 
+                    className="w-full h-full object-cover" 
+                    alt="Profile" 
+                    onError={(e) => { e.target.src = `https://ui-avatars.com/api/?name=${userDetails?.firstName || 'User'}&background=14b8a6&color=fff&size=200`; }}
+                  />
+                </div>
+                
+                <button 
+                  onClick={handleAvatarClick}
+                  className="absolute bottom-1 right-1 w-11 h-11 bg-teal-500 hover:bg-teal-600 text-white rounded-full border-4 border-white shadow-lg flex items-center justify-center transition-transform hover:scale-110 z-50 cursor-pointer"
+                  title="Change Photo"
+                >
+                  <svg className="w-4 h-4 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                  </svg>
+                </button>
+              </div>
 
-          <div className="bg-linear-to-r from-teal-500 to-cyan-500 rounded-2xl p-8 shadow-xl text-white mb-8">
-            <div className="flex items-center gap-6">
-              <img
-                src={`https://i.pravatar.cc/200?u=${currentUser.userId}&s=200`}
-                alt="Profile"
-                className="w-32 h-32 rounded-full border-4 border-white"
+              <input 
+                type="file" 
+                accept="image/*" 
+                ref={avatarUploadRef}
+                onChange={handleProfilePicUpload} 
+                className="hidden" 
               />
-            <div className="flex-1">
-                <h2 className="text-3xl font-bold mb-2">
-                  {userDetails?.firstName || currentUser?.name || 'User'} {userDetails?.lastName || ''}
-                </h2>
-                <p className="text-teal-100 text-lg mb-4">Patient ID: {currentUser.userId}</p>
-              </div>
-            </div>
-          </div>
 
-          {/* User Information Grid */}
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-            {/* Email */}
-            <div className="bg-white rounded-lg p-6 shadow-md border-l-4 border-blue-500">
-              <p className="text-gray-600 text-sm mb-1">📧 Email</p>
-              <p className="text-gray-900 font-semibold break-all">{userDetails?.email || 'N/A'}</p>
-            </div>
+              <h1 className="text-2xl font-black text-slate-800 tracking-tight">
+                {userDetails?.firstName || currentUser?.name || 'Patient'} {userDetails?.lastName || ''}
+              </h1>
+              <span className="inline-block px-3 py-1 bg-teal-50 text-teal-700 text-xs font-bold rounded-full mt-2 mb-4">
+                ID: #{currentUser?.userId}
+              </span>
 
-            {/* Phone */}
-            <div className="bg-white rounded-lg p-6 shadow-md border-l-4 border-green-500">
-              <p className="text-gray-600 text-sm mb-1">📱 Phone</p>
-              <p className="text-gray-900 font-semibold">{userDetails?.phoneNumber || 'Not provided'}</p>
-            </div>
+              <div className="w-full h-px bg-slate-100 my-6"></div>
 
-            {/* Age */}
-            <div className="bg-white rounded-lg p-6 shadow-md border-l-4 border-yellow-500">
-              <p className="text-gray-600 text-sm mb-1">🎂 Age</p>
-              <p className="text-gray-900 font-semibold">{userDetails?.age || 'Not provided'}</p>
-            </div>
-
-            {/* Gender */}
-            <div className="bg-white rounded-lg p-6 shadow-md border-l-4 border-purple-500">
-              <p className="text-gray-600 text-sm mb-1">👥 Gender</p>
-              <p className="text-gray-900 font-semibold">{userDetails?.gender || 'Not provided'}</p>
-            </div>
-
-            {/* Account Status */}
-            <div className="bg-white rounded-lg p-6 shadow-md border-l-4 border-orange-500">
-              <p className="text-gray-600 text-sm mb-1">✅ Status</p>
-              <p className="text-gray-900 font-semibold">
-                {userDetails?.isActive !== false ? 'Active' : 'Inactive'}
-              </p>
-            </div>
-
-            {/* Joined Date */}
-            <div className="bg-white rounded-lg p-6 shadow-md border-l-4 border-red-500">
-              <p className="text-gray-600 text-sm mb-1">📅 Member Since</p>
-              <p className="text-gray-900 font-semibold">
-                {userDetails?.createdAt 
-                  ? new Date(userDetails.createdAt).toLocaleDateString('en-US', { 
-                      month: 'short', 
-                      day: 'numeric',
-                      year: 'numeric'
-                    })
-                  : 'April 2026'}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* Prescriptions Section */}
-        <div className="mb-12">
-          <h2 className="text-2xl font-bold text-gray-900 mb-6">💊 My Prescriptions</h2>
-          {prescriptions.length === 0 ? (
-            <div className="bg-white rounded-lg p-6 shadow-md text-gray-500">
-              No prescriptions available for your patient account yet.
-            </div>
-          ) : (
-            <div className="grid gap-4">
-              {prescriptions.map((prescription) => (
-                <div
-                  key={prescription.id}
-                  className="bg-white rounded-lg p-6 shadow-md border-l-4 border-emerald-500"
-                >
-                  <div className="flex flex-wrap items-start justify-between gap-2">
-                    <div>
-                      <p className="text-sm text-gray-500">Prescription ID</p>
-                      <p className="font-bold text-gray-800">{prescription.id}</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-sm text-gray-500">Issued Date</p>
-                      <p className="font-semibold text-gray-700">
-                        {prescription.issuedAt
-                          ? new Date(prescription.issuedAt).toLocaleDateString('en-US')
-                          : 'N/A'}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="mt-4 grid gap-2 text-sm text-gray-700 sm:grid-cols-2">
-                    <p><span className="font-semibold">Doctor:</span> Dr. {prescription.doctorName || 'N/A'}</p>
-                    <p><span className="font-semibold">Appointment:</span> #{prescription.appointmentId || 'N/A'}</p>
-                    <p className="sm:col-span-2"><span className="font-semibold">Diagnosis:</span> {prescription.diagnosis || 'N/A'}</p>
-                    <div className="sm:col-span-2">
-                      <p className="font-semibold">Medicines:</p>
-                      {Array.isArray(prescription.medications) && prescription.medications.length > 0 ? (
-                        <ul className="mt-1 space-y-1 text-sm text-gray-600">
-                          {prescription.medications.map((m, i) => (
-                            <li key={`${prescription.id}-med-${i}`}>
-                              {m?.name || 'Medicine'} - {m?.dosage || 'N/A'}, {m?.frequency || 'N/A'}, {m?.duration || 'N/A'}
-                            </li>
-                          ))}
-                        </ul>
-                      ) : (
-                        <p className="text-gray-500">No medicine entries.</p>
-                      )}
-                    </div>
-                    {prescription.notes ? (
-                      <p className="sm:col-span-2"><span className="font-semibold">Notes:</span> {prescription.notes}</p>
-                    ) : null}
+              {/* User Meta Data */}
+              <div className="space-y-4 text-left">
+                <div className="flex items-center gap-4">
+                  <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-500 flex items-center justify-center text-lg">📧</div>
+                  <div>
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Email Address</p>
+                    <p className="text-sm font-bold text-slate-800 break-all">{userDetails?.email || currentUser?.email || 'N/A'}</p>
                   </div>
                 </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Appointments Section */}
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-6">📋 My Appointments</h2>
-
-          {activeCall ? (
-            <div className="mb-6 rounded-2xl bg-white p-4 shadow-lg">
-              <div className="mb-3 flex items-center justify-between">
-                <div>
-                  <h3 className="text-lg font-bold text-gray-800">Telemedicine Session</h3>
-                  <p className="text-sm text-gray-500">
-                    Appointment #{getAppointmentId(activeCall.appointment)} with Dr. {activeCall.appointment?.doctorFirstName || ''} {activeCall.appointment?.doctorLastName || ''}
-                  </p>
+                <div className="flex items-center gap-4">
+                  <div className="w-10 h-10 rounded-xl bg-green-50 text-green-500 flex items-center justify-center text-lg">📱</div>
+                  <div>
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Mobile Phone</p>
+                    <p className="text-sm font-bold text-slate-800">{userDetails?.phoneNumber || 'Not provided'}</p>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => openPatientCallInNewTab(activeCall.roomName)}
-                    className="rounded-lg bg-slate-700 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 transition"
-                  >
-                    Open In New Tab
-                  </button>
-                  <button
-                    onClick={endTelemedicineCall}
-                    className="rounded-lg bg-red-500 px-4 py-2 text-sm font-semibold text-white hover:bg-red-600 transition"
-                  >
-                    End Call
-                  </button>
+                <div className="flex items-center gap-4">
+                  <div className="w-10 h-10 rounded-xl bg-purple-50 text-purple-500 flex items-center justify-center text-lg">👥</div>
+                  <div>
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Demographics</p>
+                    <p className="text-sm font-bold text-slate-800">{userDetails?.age ? `${userDetails.age} yrs` : 'Age N/A'} • {userDetails?.gender || 'Gender N/A'}</p>
+                  </div>
                 </div>
               </div>
-              <div className="overflow-hidden rounded-xl border" style={{ height: '520px' }}>
-                <iframe
-                  src={buildJitsiCallUrl(activeCall.roomName, userDetails?.firstName || currentUser?.name || 'Patient')}
-                  allow="camera *; microphone *; fullscreen *; display-capture *; autoplay *"
-                  className="h-full w-full border-0"
-                  title="Patient Video Consultation"
-                />
-              </div>
-              <p className="mt-2 text-xs text-gray-500">Room: {activeCall.roomName}</p>
-              <p className="mt-1 text-xs text-slate-500">Local device access: {mediaReady ? 'Camera/Mic ready' : 'Not verified for this session'}</p>
-              <p className="mt-1 text-xs text-amber-600">If camera is blocked in iframe, click Open In New Tab and allow camera/mic permission.</p>
-            </div>
-          ) : null}
 
-          <div className="mb-4">
-            <button
-              type="button"
-              onClick={checkMediaPermissions}
-              className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-            >
-              Enable Camera & Mic
-            </button>
-          </div>
-
-          {appointments.length === 0 ? (
-            <div className="bg-white rounded-lg p-8 shadow-md text-center">
-              <p className="text-gray-500 text-lg mb-4">No appointments booked yet</p>
-              <button
-                onClick={() => navigate('/appointment')}
-                className="bg-teal-600 text-white px-6 py-2 rounded-lg hover:bg-teal-700 transition"
+              {/* 🚨 THE FIX: This accurately copies your details into the form immediately on click! */}
+              <button 
+                onClick={() => {
+                  if (!isEditing) {
+                    setEditForm({
+                      firstName: userDetails?.firstName || '',
+                      lastName: userDetails?.lastName || '',
+                      phoneNumber: userDetails?.phoneNumber || '',
+                      age: userDetails?.age || '',
+                      gender: userDetails?.gender || ''
+                    });
+                  }
+                  setIsEditing(!isEditing);
+                }}
+                className={`mt-8 w-full py-3 rounded-xl font-bold transition-all ${isEditing ? 'bg-slate-200 text-slate-700 hover:bg-slate-300' : 'bg-slate-900 text-white shadow-lg hover:bg-slate-800'}`}
               >
-                Book an Appointment
+                {isEditing ? 'Cancel Editing' : '✏️ Edit Profile Details'}
               </button>
+
             </div>
-          ) : (
-            <div className="grid gap-6">
-              {appointments.map((appointment, index) => (
-                <div
-                  key={appointment.id || index}
-                  className="bg-white rounded-lg p-6 shadow-md border-l-4 border-teal-500 hover:shadow-lg transition"
-                >
-                  <div className="grid md:grid-cols-5 gap-4 items-start">
-                    {/* Doctor Info */}
-                    <div className="md:col-span-2">
-                      <p className="text-gray-600 text-sm mb-1">👨‍⚕️ Doctor</p>
-                      <p className="text-gray-900 font-semibold text-lg">
-                        Dr. {appointment.doctorFirstName || 'Unknown'} {appointment.doctorLastName || ''}
-                      </p>
+          </div>
+
+          {/* ================= RIGHT COLUMN: DASHBOARD ================= */}
+          <div className="lg:col-span-8 flex flex-col gap-6">
+            
+            <AnimatePresence mode="wait">
+              {isEditing ? (
+                // --- EDIT PROFILE FORM ---
+                <motion.div key="edit" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="bg-white rounded-3xl p-8 shadow-sm border border-slate-100">
+                  <h2 className="text-2xl font-black text-slate-800 mb-6 flex items-center gap-3">
+                    <span className="w-10 h-10 rounded-xl bg-teal-50 text-teal-600 flex items-center justify-center text-xl">📝</span>
+                    Update Personal Details
+                  </h2>
+                  
+                  <form onSubmit={handleUpdateProfile} className="space-y-6">
+                    <div className="grid md:grid-cols-2 gap-6">
+                      <InputField label="First Name" value={editForm.firstName} onChange={v => setEditForm({...editForm, firstName: v})} />
+                      <InputField label="Last Name" value={editForm.lastName} onChange={v => setEditForm({...editForm, lastName: v})} />
+                      <InputField label="Phone Number" value={editForm.phoneNumber} onChange={v => setEditForm({...editForm, phoneNumber: v})} />
+                      <InputField label="Age" type="number" value={editForm.age} onChange={v => setEditForm({...editForm, age: v})} />
+                      
+                      <div className="md:col-span-2 space-y-2">
+                        <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-2">Gender</label>
+                        <select 
+                            className="w-full bg-slate-50 border-none text-slate-800 font-bold rounded-2xl p-4 outline-none focus:ring-4 ring-teal-500/20 transition-all appearance-none cursor-pointer"
+                            value={editForm.gender || ''}
+                            onChange={e => setEditForm({...editForm, gender: e.target.value})}
+                        >
+                            <option value="">Select Gender</option>
+                            <option value="Male">Male</option>
+                            <option value="Female">Female</option>
+                            <option value="Other">Other</option>
+                        </select>
+                      </div>
                     </div>
 
-                    {/* Date */}
-                    <div>
-                      <p className="text-gray-600 text-sm mb-1">📅 Date</p>
-                      <p className="text-gray-900 font-semibold">
-                        {appointment.appointmentDate
-                          ? new Date(appointment.appointmentDate).toLocaleDateString('en-US', {
-                              weekday: 'short',
-                              month: 'short',
-                              day: 'numeric',
-                            })
-                          : 'N/A'}
-                      </p>
+                    <div className="pt-6 border-t border-slate-100 flex justify-end">
+                        <button type="submit" className="px-10 py-4 bg-teal-600 text-white rounded-xl font-black hover:bg-teal-700 transition-colors shadow-lg">
+                            Save Changes
+                        </button>
                     </div>
+                  </form>
+                </motion.div>
 
-                    {/* Time */}
-                    <div>
-                      <p className="text-gray-600 text-sm mb-1">⏰ Time</p>
-                      <p className="text-gray-900 font-semibold">{appointment.appointmentTime || 'N/A'}</p>
-                    </div>
-
-                    {/* Status */}
-                    <div>
-                      <p className="text-gray-600 text-sm mb-1">ℹ️ Status</p>
-                      <span className="inline-block bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-semibold capitalize">
-                        {appointment.status || 'Confirmed'}
-                      </span>
-                    </div>
+              ) : (
+                // --- NORMAL TABS DASHBOARD ---
+                <motion.div key="tabs" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+                  <div className="bg-white rounded-2xl p-2 shadow-sm border border-slate-100 flex overflow-x-auto gap-2 mb-6">
+                      <button 
+                        onClick={() => setActiveTab('appointments')} 
+                        className={`flex-1 py-3 px-4 rounded-xl text-sm font-bold transition-all whitespace-nowrap ${activeTab === 'appointments' ? 'bg-teal-500 text-white shadow-md' : 'text-slate-500 hover:bg-slate-50'}`}
+                      >
+                        📅 Appointments
+                      </button>
+                      <button 
+                        onClick={() => setActiveTab('prescriptions')} 
+                        className={`flex-1 py-3 px-4 rounded-xl text-sm font-bold transition-all whitespace-nowrap ${activeTab === 'prescriptions' ? 'bg-teal-500 text-white shadow-md' : 'text-slate-500 hover:bg-slate-50'}`}
+                      >
+                        💊 Prescriptions
+                      </button>
                   </div>
 
-                  {/* Reason */}
-                  <div className="mt-4 pt-4 border-t border-gray-200">
-                    <p className="text-gray-600 text-sm mb-1">📝 Reason</p>
-                    <p className="text-gray-900">{appointment.reason || 'No reason provided'}</p>
-                  </div>
+                  {/* TAB: Appointments */}
+                  {activeTab === 'appointments' && (
+                    <div className="space-y-6">
+                      {activeCall && (
+                        <div className="bg-slate-900 rounded-3xl p-4 shadow-2xl border-4 border-slate-800">
+                          <div className="flex justify-between items-center mb-4 px-2">
+                            <div className="text-white">
+                              <h3 className="font-bold text-lg flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span> Live Consultation</h3>
+                              <p className="text-xs text-slate-400">Dr. {activeCall.appointment?.doctorFirstName || ''} {activeCall.appointment?.doctorLastName || ''}</p>
+                            </div>
+                            <button onClick={() => setActiveCall(null)} className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-bold transition-colors">
+                              End Session
+                            </button>
+                          </div>
+                          <div className="w-full h-[500px] rounded-2xl overflow-hidden bg-black">
+                            <iframe
+                              src={buildJitsiCallUrl(activeCall.roomName, userDetails?.firstName || currentUser?.name || 'Patient')}
+                              allow="camera *; microphone *; fullscreen *; display-capture *; autoplay *"
+                              className="w-full h-full border-0"
+                              title="Telemedicine"
+                            />
+                          </div>
+                        </div>
+                      )}
 
-                  {/* Token */}
-                  {appointment.token && (
-                    <div className="mt-4 bg-blue-50 rounded p-3 border-l-4 border-blue-500">
-                      <p className="text-blue-600 text-sm font-mono">
-                        🎟️ Token: <span className="font-semibold">{appointment.token}</span>
-                      </p>
+                      {appointments.length === 0 ? (
+                        <div className="bg-white rounded-3xl p-12 text-center border border-slate-100 shadow-sm">
+                          <span className="text-5xl block mb-4">🩺</span>
+                          <h3 className="text-xl font-bold text-slate-800 mb-2">No Appointments Yet</h3>
+                          <p className="text-slate-500 mb-6">You haven't booked any medical consultations.</p>
+                          <button onClick={() => navigate('/appointment')} className="bg-teal-600 hover:bg-teal-700 text-white px-8 py-3 rounded-xl font-bold transition-colors">
+                            Book Now
+                          </button>
+                        </div>
+                      ) : (
+                        appointments.map((appt) => (
+                          <div key={appt.id} className="bg-white rounded-3xl p-6 border border-slate-100 shadow-sm hover:shadow-md transition-shadow">
+                            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-4 pb-4 border-b border-slate-50">
+                              <div className="flex items-center gap-4">
+                                <div className="w-14 h-14 rounded-2xl bg-teal-50 text-teal-600 flex items-center justify-center text-2xl border border-teal-100">👨‍⚕️</div>
+                                <div>
+                                  <h4 className="font-black text-slate-800 text-lg">Dr. {appt.doctorFirstName} {appt.doctorLastName}</h4>
+                                  <p className="text-sm font-bold text-teal-600">{new Date(appt.appointmentDate).toLocaleDateString()} at {appt.appointmentTime}</p>
+                                </div>
+                              </div>
+                              <span className={`px-4 py-2 rounded-full text-xs font-black tracking-widest uppercase ${appt.status === 'CONFIRMED' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                                {appt.status || 'PENDING'}
+                              </span>
+                            </div>
+                            <div className="mb-6">
+                              <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Reason for Visit</p>
+                              <p className="text-slate-700 text-sm">{appt.reason || 'Not specified'}</p>
+                            </div>
+                            <div className="flex flex-wrap gap-3">
+                              <button onClick={() => startTelemedicineCall(appt)} disabled={!canJoinTelemedicine(appt)} className="flex-1 md:flex-none bg-teal-600 hover:bg-teal-700 disabled:bg-slate-200 disabled:text-slate-400 text-white px-6 py-2.5 rounded-xl font-bold text-sm transition-colors flex items-center justify-center gap-2">
+                                🎥 Join Video Call
+                              </button>
+                            </div>
+                          </div>
+                        ))
+                      )}
                     </div>
                   )}
 
-                  {/* Actions */}
-                  <div className="mt-6 pt-4 border-t border-gray-200 flex gap-3">
-                    <button
-                      onClick={() => {
-                        // Reschedule action
-                        alert('Reschedule functionality coming soon!');
-                      }}
-                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-semibold text-sm"
-                    >
-                      📅 Reschedule
-                    </button>
-                    <button
-                      onClick={() => {
-                        // Cancel action
-                        if (window.confirm('Are you sure you want to cancel this appointment?')) {
-                          alert('Appointment cancelled! You will receive a confirmation email.');
-                        }
-                      }}
-                      className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition font-semibold text-sm"
-                    >
-                      ❌ Cancel
-                    </button>
-                    <button
-                      onClick={() => {
-                        // Download slip
-                        alert('Download appointment slip coming soon!');
-                      }}
-                      className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition font-semibold text-sm"
-                    >
-                      📄 Download Slip
-                    </button>
-                    <button
-                      onClick={() => startTelemedicineCall(appointment)}
-                      disabled={!canJoinTelemedicine(appointment)}
-                      className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition font-semibold text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      🎥 Join Call
-                    </button>
-                  </div>
-                  {!canJoinTelemedicine(appointment) ? (
-                    <p className="mt-3 text-xs text-slate-500">Call is available when appointment status is CONFIRMED.</p>
-                  ) : null}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Edit Profile Button */}
-        <div className="mt-12 flex gap-4">
-          <button
-            onClick={() => navigate('/')}
-            className="px-6 py-3 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition font-semibold"
-          >
-            Back to Home
-          </button>
+                  {/* TAB: Prescriptions */}
+                  {activeTab === 'prescriptions' && (
+                    <div className="space-y-6">
+                      {prescriptions.length === 0 ? (
+                        <div className="bg-white rounded-3xl p-12 text-center border border-slate-100 shadow-sm">
+                          <span className="text-5xl block mb-4">💊</span>
+                          <h3 className="text-xl font-bold text-slate-800 mb-2">No Prescriptions</h3>
+                          <p className="text-slate-500">Your doctors haven't uploaded any prescriptions yet.</p>
+                        </div>
+                      ) : (
+                        prescriptions.map((rx) => (
+                          <div key={rx.id} className="bg-white rounded-3xl p-6 border border-slate-100 shadow-sm">
+                            <div className="flex justify-between items-center mb-4">
+                              <h4 className="font-black text-slate-800">Prescription #{rx.id}</h4>
+                              <span className="text-xs font-bold text-slate-400">{new Date(rx.issuedAt).toLocaleDateString()}</span>
+                            </div>
+                            <div className="bg-slate-50 rounded-2xl p-4 mb-4">
+                              <p className="text-sm text-slate-700"><span className="font-bold">Diagnosis:</span> {rx.diagnosis || 'N/A'}</p>
+                              <p className="text-sm text-slate-700 mt-1"><span className="font-bold">Doctor:</span> Dr. {rx.doctorName || 'N/A'}</p>
+                            </div>
+                            <h5 className="font-bold text-xs uppercase tracking-widest text-slate-400 mb-3">Medications</h5>
+                            <ul className="space-y-2">
+                              {rx.medications?.map((m, i) => (
+                                <li key={i} className="flex items-center gap-3 text-sm text-slate-700">
+                                  <span className="w-2 h-2 rounded-full bg-teal-500"></span>
+                                  <span className="font-bold">{m?.name}</span> - {m?.dosage}, {m?.frequency} ({m?.duration})
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  )}
+                </motion.div>
+              )}
+            </AnimatePresence>
+            
+          </div>
         </div>
       </div>
     </div>
   );
 };
+
+// --- Helper Component ---
+const InputField = ({ label, type = "text", value, onChange }) => (
+    <div className="space-y-2">
+        <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-2">{label}</label>
+        <input type={type} className="w-full bg-slate-50 border-none text-slate-800 font-bold rounded-2xl p-4 outline-none focus:ring-4 ring-teal-500/20 transition-all placeholder:text-slate-300" value={value || ''} onChange={e => onChange(e.target.value)} placeholder={`Enter ${label.toLowerCase()}`} />
+    </div>
+);
 
 export default ProfilePage;
