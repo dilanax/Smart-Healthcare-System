@@ -131,7 +131,6 @@ const AdminDashboard = ({ navigate, currentUser, refreshUser }) => {
   const [showAppointmentModal, setShowAppointmentModal] = useState(false);
   const [showEditAppointmentModal, setShowEditAppointmentModal] = useState(false);
   const [editAppointmentForm, setEditAppointmentForm] = useState({});
-  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [payments, setPayments] = useState([]);
   const [notifications, setNotifications] = useState([]);
   const [notificationSummary, setNotificationSummary] = useState(null);
@@ -141,6 +140,16 @@ const AdminDashboard = ({ navigate, currentUser, refreshUser }) => {
   const [doctorImageFile, setDoctorImageFile] = useState(null);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [editingDoctorId, setEditingDoctorId] = useState(null);
+
+  // ✅ Payment edit modal states
+  const [selectedPayment, setSelectedPayment] = useState(null);
+  const [showEditPaymentModal, setShowEditPaymentModal] = useState(false);
+
+  const [editPaymentForm, setEditPaymentForm] = useState({
+     amount: "",
+     status: "",
+     method: "",
+});
 
   const accessToken = currentUser?.accessToken;
 
@@ -233,28 +242,42 @@ const deletePayment = async (paymentId) => {
   }
 };
 
-const updatePayment = async (paymentId) => {
-  const newAmount = prompt("Enter new amount:");
-  if (!newAmount) return;
+const openEditPayment = (payment) => {
+  setSelectedPayment(payment);
+  setEditPaymentForm({
+    amount: payment.amount,
+    status: payment.status,
+    method: payment.method,
+  });
+  setShowEditPaymentModal(true);
+};
+
+const submitEditPayment = async (e) => {
+  e.preventDefault();
+  if (!selectedPayment) return;
 
   try {
     await fetch(
-      `http://localhost:8086/payments/admin/update/${paymentId}`,
+      `http://localhost:8086/payments/admin/update/${selectedPayment.id}`,
       {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          amount: Number(newAmount),
-          status: "SUCCESS",
-          method: "ADMIN_UPDATED"
+          amount: Number(editPaymentForm.amount),
+          status: editPaymentForm.status,
+          method: editPaymentForm.method,
         }),
       }
     );
-    loadPayments(); // refresh table
+
+    setShowEditPaymentModal(false);
+    setSelectedPayment(null);
+    loadPayments();
   } catch (err) {
     alert("Failed to update payment");
   }
 };
+
 
 const approvePayment = async (paymentId) => {
   try {
@@ -871,17 +894,6 @@ const approvePayment = async (paymentId) => {
     }
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem('healthcare_auth_user');
-    refreshUser();
-    navigate('/login');
-  };
-
-  const confirmLogout = () => {
-    setShowLogoutConfirm(false);
-    handleLogout();
-  };
-
   if (!currentUser || currentUser.role !== 'ADMIN' || !accessToken) return null;
 
   return (
@@ -900,15 +912,6 @@ const approvePayment = async (paymentId) => {
                 </button>
               ))}
             </nav>
-            <div className="mt-8 border-t border-teal-700/50 pt-6">
-              <button
-                type="button"
-                onClick={() => setShowLogoutConfirm(true)}
-                className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-teal-100 hover:bg-red-500/20 hover:text-red-300 transition"
-              >
-                <i className="fas fa-sign-out-alt w-5"></i><span className="text-sm font-medium">Logout</span>
-              </button>
-            </div>
           </div>
         </aside>
 
@@ -1263,24 +1266,24 @@ const approvePayment = async (paymentId) => {
                 <td className="px-6 py-4 flex gap-2">
                   
                  {/* Approve - ONLY if PENDING */}
-                 {p.status === "PENDING" && p.method === "CASH" &&(
-                <button
-                onClick={() => approvePayment(p.id)}
-                className="px-3 py-1 text-xs font-semibold rounded-md bg-green-100 text-green-700 hover:bg-green-200"
+                
+                  {p.status === "PENDING" && (
+                  <button
+                 onClick={() => approvePayment(p.id)}
+                 className="px-3 py-1 text-xs font-semibold rounded-md bg-green-100 text-green-700 hover:bg-green-200"
                 >
-                ✅ Approve
-               </button>
-                )}
+               ✅ Approve
+              </button>
+              )}
+ 
 
-                {/* Edit Payment – NOT allowed for PayHere */}
-                 {p.method !== "PAYHERE_TEST" && (
-                      <button
-                      onClick={() => updatePayment(p.id)}
-                      className="px-3 py-1 text-xs font-semibold rounded-md bg-amber-100 text-amber-700 hover:bg-amber-200"
-                    >
-                     ✏️ Edit
-                  </button>
-                )}          
+                {/* Edit Payment  */}
+                <button
+                 onClick={() => openEditPayment(p)}
+                 className="px-3 py-1 text-xs font-semibold rounded-md bg-amber-100 text-amber-700 hover:bg-amber-200"
+                >
+                ✏️ Edit
+                </button>          
 
                  {/* Delete Payment */}
                   <button
@@ -1617,40 +1620,110 @@ const approvePayment = async (paymentId) => {
         </div>
       ) : null}
 
-      {/* Logout confirmation modal */}
-      {showLogoutConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-sm rounded-2xl bg-white shadow-2xl">
-            <div className="flex items-center justify-center border-b px-6 py-4">
-              <i className="fas fa-exclamation-triangle text-3xl text-amber-500" />
-            </div>
-            <div className="px-6 py-6 text-center">
-              <h3 className="text-lg font-bold text-gray-800">Logout Confirmation</h3>
-              <p className="mt-3 text-sm text-gray-600">
-                Are you sure you want to logout? You will need to log in again to access the admin dashboard.
-              </p>
-            </div>
-            <div className="flex gap-3 border-t px-6 py-4">
-              <button
-                type="button"
-                onClick={() => setShowLogoutConfirm(false)}
-                className="flex-1 rounded-xl border border-gray-300 px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={confirmLogout}
-                className="flex-1 rounded-xl bg-red-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-red-600 transition"
-              >
-                <i className="fas fa-sign-out-alt mr-2" />
-                Logout
-              </button>
-            </div>
-          </div>
+
+      {showEditPaymentModal && selectedPayment && (
+  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+    <div className="w-full max-w-md rounded-2xl bg-white p-6">
+
+      {/* Header */}
+      <div className="mb-4 flex items-center justify-between">
+        <h3 className="text-xl font-bold text-gray-800">Edit Payment</h3>
+        <button
+          onClick={() => setShowEditPaymentModal(false)}
+          className="text-gray-400 hover:text-gray-600"
+        >
+          ❌
+        </button>
+      </div>
+
+      {/* Info */}
+      <div className="mb-4 text-sm text-gray-600">
+        <p><b>Payment ID:</b> #{selectedPayment.id}</p>
+        <p><b>Appointment:</b> #{selectedPayment.appointmentId}</p>
+      </div>
+
+      {/* Form */}
+      <form onSubmit={submitEditPayment} className="space-y-4">
+
+        {/* Amount */}
+        <div>
+          <label className="block text-sm font-medium">Amount (LKR)</label>
+          <input
+            type="number"
+            value={editPaymentForm.amount}
+            onChange={(e) =>
+              setEditPaymentForm({
+                ...editPaymentForm,
+                amount: e.target.value,
+              })
+            }
+            className="w-full rounded-lg border px-4 py-2"
+            required
+          />
         </div>
-      )}
+
+        {/* Method */}
+        <div>
+          <label className="block text-sm font-medium">Method</label>
+          <select
+            value={editPaymentForm.method}
+            onChange={(e) =>
+              setEditPaymentForm({
+                ...editPaymentForm,
+                method: e.target.value,
+              })
+            }
+            className="w-full rounded-lg border px-4 py-2"
+          >
+            <option value="PAYHERE_TEST">PayHere</option>
+            <option value="CASH">Cash</option>
+            <option value="ADMIN_UPDATED">Admin Updated</option>
+          </select>
+        </div>
+
+        {/* Status */}
+        <div>
+          <label className="block text-sm font-medium">Status</label>
+          <select
+            value={editPaymentForm.status}
+            onChange={(e) =>
+              setEditPaymentForm({
+                ...editPaymentForm,
+                status: e.target.value,
+              })
+            }
+            className="w-full rounded-lg border px-4 py-2"
+          >
+            <option value="PENDING">Pending</option>
+            <option value="SUCCESS">Success</option>
+            <option value="FAILED">Failed</option>
+          </select>
+        </div>
+
+        {/* Actions */}
+        <div className="flex justify-end gap-3">
+          <button
+            type="button"
+            onClick={() => setShowEditPaymentModal(false)}
+            className="rounded-lg border px-4 py-2"
+          >
+            Cancel
+          </button>
+
+          <button
+            type="submit"
+            className="rounded-lg bg-amber-500 px-6 py-2 text-white font-semibold hover:bg-amber-600"
+          >
+            Save Changes
+          </button>
+        </div>
+
+      </form>
     </div>
+  </div>
+)}
+
+ </div>
   );
 };
 

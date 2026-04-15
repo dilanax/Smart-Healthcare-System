@@ -4,13 +4,11 @@ import com.example.demo.model.Payment;
 import com.example.demo.model.PaymentStatus;
 import com.example.demo.service.PaymentService;
 import lombok.RequiredArgsConstructor;
+import org.apache.commons.codec.digest.DigestUtils;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.util.List;
 import java.util.Map;
 
@@ -50,57 +48,39 @@ public class PaymentController {
         String currency = "LKR";
 
         // Step 1: Hash merchant secret
-        String hashedSecret = md5Hex(merchantSecret).toUpperCase();
+        String hashedSecret =
+                DigestUtils.md5Hex(merchantSecret).toUpperCase();
 
         // Step 2: Create hash string
         String hashString =
                 merchantId + orderId + amount + currency + hashedSecret;
 
         // Step 3: Return final hash
-        return md5Hex(hashString).toUpperCase();
-    }
-
-    private String md5Hex(String value) {
-        try {
-            MessageDigest messageDigest = MessageDigest.getInstance("MD5");
-            byte[] digest = messageDigest.digest(value.getBytes(StandardCharsets.UTF_8));
-            StringBuilder hex = new StringBuilder();
-
-            for (byte currentByte : digest) {
-                hex.append(String.format("%02x", currentByte));
-            }
-
-            return hex.toString();
-        } catch (NoSuchAlgorithmException exception) {
-            throw new IllegalStateException("MD5 algorithm is not available.", exception);
-        }
+        return DigestUtils.md5Hex(hashString).toUpperCase();
     }
 
     // ====================================================
     // ✅ PAYHERE CALLBACK (REAL GATEWAY CONFIRMATION)
     // ====================================================
     @PostMapping("/payhere-notify")
-    public ResponseEntity<String> payHereNotify(
-            @RequestParam("order_id") String orderId,
-            @RequestParam("payhere_amount") String amount,
-            @RequestParam("status_code") int statusCode) {
+public ResponseEntity<String> payHereNotify(
+        @RequestParam("order_id") String orderId,
+        @RequestParam("payhere_amount") String amount,
+        @RequestParam("status_code") int statusCode) {
 
-        // PayHere status_code = 2 means SUCCESS
-        if (statusCode == 2) {
-            Payment payment = new Payment();
+    if (statusCode == 2) { // SUCCESS
+        Long appointmentId =
+                Long.parseLong(orderId.replace("APT_", ""));
 
-            payment.setAppointmentId(
-                    Long.valueOf(orderId.replace("APT_", ""))
-            );
-            payment.setAmount(Double.valueOf(amount));
-            payment.setMethod("PAYHERE_TEST");
-            payment.setStatus(PaymentStatus.SUCCESS);
-
-            paymentService.createPayment(payment);
-        }
-
-        return ResponseEntity.ok("OK");
+        paymentService.confirmPayHerePayment(
+                appointmentId,
+                Double.valueOf(amount)
+        );
     }
+
+    return ResponseEntity.ok("OK");
+}
+   
 
     // ====================================================
     // ✅ ADMIN ENDPOINTS

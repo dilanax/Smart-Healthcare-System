@@ -39,6 +39,27 @@ public class PaymentService {
         return repository.save(payment);
     }
 
+    public void confirmPayHerePayment(Long appointmentId, Double amount) {
+
+    Payment payment = repository.findAll().stream()
+            .filter(p ->
+                    p.getAppointmentId().equals(appointmentId) &&
+                    p.getStatus() == PaymentStatus.PENDING &&
+                    "PAYHERE_TEST".equals(p.getMethod())
+            )
+            .findFirst()
+            .orElseThrow(() ->
+                    new RuntimeException("Pending PayHere payment not found")
+            );
+
+    payment.setAmount(amount);
+    payment.setStatus(PaymentStatus.SUCCESS);
+    applyRevenueSplit(payment);
+
+    repository.save(payment);
+}
+
+
     // =========================
     // READ ALL PAYMENTS (Admin)
     // =========================
