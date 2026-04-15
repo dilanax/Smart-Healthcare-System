@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
 import Home from './pages/home';
 import AdminDashboard from './pages/admin-dashboard';
+import DoctorDashboard from './pages/doctor-dashboard';
 import LoginPage from './pages/login-page';
 import OtpPage from './pages/otp-page';
 import RegisterPage from './pages/register-page';
 import AppointmentPage from './pages/appointment-page';
+import PaymentPage from "./pages/payment-page";
 import ProfilePage from './pages/profile-page';
 import { getStoredUser } from './lib/auth';
 import './App.css';
@@ -15,7 +17,9 @@ const routes = {
   '/register': RegisterPage,
   '/otp': OtpPage,
   '/admin': AdminDashboard,
+  '/doctor': DoctorDashboard,
   '/appointment': AppointmentPage,
+  '/payment': PaymentPage,
   '/profile': ProfilePage,
 };
 

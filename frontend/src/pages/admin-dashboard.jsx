@@ -1,11 +1,15 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { deleteUser, fetchUserById, fetchUsers, registerUser, updateUser } from '../lib/auth';
+import { deleteNotificationById, fetchNotificationSummary, fetchNotifications, sendNotificationById, updateNotificationStatus } from '../lib/notifications';
+import { createDoctorProfile, deleteDoctorProfile, fetchDoctorProfiles, updateDoctorProfile } from '../lib/doctors';
+import { uploadDoctorImage } from '../lib/supabase';
 
 const menu = [
   ['overview', 'fas fa-chart-line', 'Dashboard Overview'],
   ['users', 'fas fa-users', 'User Management'],
   ['doctors', 'fas fa-user-md', 'Doctor Verification'],
   ['appointments', 'fas fa-calendar-check', 'Appointments'],
+  ['notifications', 'fas fa-bell', 'Notification Management'],
   ['payments', 'fas fa-credit-card', 'Transactions'],
   ['reports', 'fas fa-file-alt', 'Reports'],
   ['settings', 'fas fa-cog', 'Settings'],
@@ -70,6 +74,43 @@ const toEditForm = (user) => ({
   active: user?.active ?? true,
 });
 
+const emptyDoctorProfileForm = {
+  firstName: '',
+  lastName: '',
+  specialization: '',
+  hospital: '',
+  email: '',
+  loginPassword: '',
+  phoneNumber: '',
+  imageUrl: '',
+  availability: 'Available Today',
+  consultationFee: '2500',
+  rating: '5',
+  experienceYears: '5',
+  patientCount: '0',
+};
+
+const toDoctorProfileForm = (doctor) => ({
+  firstName: doctor?.firstName ?? '',
+  lastName: doctor?.lastName ?? '',
+  specialization: doctor?.specialization ?? doctor?.specialty ?? '',
+  hospital: doctor?.hospital ?? '',
+  email: doctor?.email ?? '',
+  loginPassword: '',
+  phoneNumber: doctor?.phoneNumber ?? '',
+  imageUrl: doctor?.imageUrl ?? '',
+  availability: doctor?.availability ?? 'Available Today',
+  consultationFee: String(doctor?.consultationFee ?? '2500'),
+  rating: String(doctor?.rating ?? '5'),
+  experienceYears: String(doctor?.experienceYears ?? '5'),
+  patientCount: String(doctor?.patientCount ?? '0'),
+});
+
+const generateDoctorPassword = () => {
+  const base = Math.random().toString(36).slice(-6);
+  return `Dr@${base}9A`;
+};
+
 const AdminDashboard = ({ navigate, currentUser, refreshUser }) => {
   const [activeTab, setActiveTab] = useState('overview');
   const [users, setUsers] = useState([]);
@@ -90,6 +131,25 @@ const AdminDashboard = ({ navigate, currentUser, refreshUser }) => {
   const [showAppointmentModal, setShowAppointmentModal] = useState(false);
   const [showEditAppointmentModal, setShowEditAppointmentModal] = useState(false);
   const [editAppointmentForm, setEditAppointmentForm] = useState({});
+  const [payments, setPayments] = useState([]);
+  const [notifications, setNotifications] = useState([]);
+  const [notificationSummary, setNotificationSummary] = useState(null);
+  const [doctorProfiles, setDoctorProfiles] = useState([]);
+  const [doctorProfileForm, setDoctorProfileForm] = useState(emptyDoctorProfileForm);
+  const [doctorProfileError, setDoctorProfileError] = useState('');
+  const [doctorImageFile, setDoctorImageFile] = useState(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [editingDoctorId, setEditingDoctorId] = useState(null);
+
+  // ✅ Payment edit modal states
+  const [selectedPayment, setSelectedPayment] = useState(null);
+  const [showEditPaymentModal, setShowEditPaymentModal] = useState(false);
+
+  const [editPaymentForm, setEditPaymentForm] = useState({
+     amount: "",
+     status: "",
+     method: "",
+});
 
   const accessToken = currentUser?.accessToken;
 
@@ -136,6 +196,341 @@ const AdminDashboard = ({ navigate, currentUser, refreshUser }) => {
       if (!silent) setLoading(false);
     }
   }, []);
+
+  const loadDoctorProfiles = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
+    setError('');
+
+    try {
+      const data = await fetchDoctorProfiles();
+      setDoctorProfiles(Array.isArray(data) ? data : []);
+    } catch (err) {
+      setError(err.message || 'Failed to load doctor profiles.');
+    } finally {
+      if (!silent) setLoading(false);
+    }
+  }, []);
+
+  const loadPayments = useCallback(async () => {
+  try {
+    setLoading(true);
+    const response = await fetch("http://localhost:8086/payments/admin/all");
+    if (response.ok) {
+      const data = await response.json();
+      setPayments(Array.isArray(data) ? data : data.data || []);
+    } else {
+      throw new Error("Failed to fetch payments");
+    }
+  } catch (err) {
+    setError(err.message || "Failed to load payments.");
+  } finally {
+    setLoading(false);
+  }
+}, []);
+
+const deletePayment = async (paymentId) => {
+  if (!window.confirm("Are you sure you want to delete this transaction?")) return;
+
+  try {
+    await fetch(
+      `http://localhost:8086/payments/admin/delete/${paymentId}`,
+      { method: "DELETE" }
+    );
+    loadPayments(); // refresh table
+  } catch (err) {
+    alert("Failed to delete payment");
+  }
+};
+
+const openEditPayment = (payment) => {
+  setSelectedPayment(payment);
+  setEditPaymentForm({
+    amount: payment.amount,
+    status: payment.status,
+    method: payment.method,
+  });
+  setShowEditPaymentModal(true);
+};
+
+const submitEditPayment = async (e) => {
+  e.preventDefault();
+  if (!selectedPayment) return;
+
+  try {
+    await fetch(
+      `http://localhost:8086/payments/admin/update/${selectedPayment.id}`,
+      {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          amount: Number(editPaymentForm.amount),
+          status: editPaymentForm.status,
+          method: editPaymentForm.method,
+        }),
+      }
+    );
+
+    setShowEditPaymentModal(false);
+    setSelectedPayment(null);
+    loadPayments();
+  } catch (err) {
+    alert("Failed to update payment");
+  }
+};
+
+
+const approvePayment = async (paymentId) => {
+  try {
+    await fetch(
+      `http://localhost:8086/payments/confirm/${paymentId}`,
+      { method: "POST" }
+    );
+    loadPayments(); // refresh table
+  } catch (err) {
+    alert("Failed to approve payment");
+  }
+};
+
+  const handleDoctorProfileChange = (event) => {
+    const { name, value } = event.target;
+    setDoctorProfileError('');
+    setDoctorProfileForm((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const startEditDoctorProfile = (doctor) => {
+    setDoctorProfileError('');
+    setError('');
+    setSuccess('');
+    setEditingDoctorId(doctor.userId);
+    setDoctorProfileForm(toDoctorProfileForm(doctor));
+    setDoctorImageFile(null);
+  };
+
+  const cancelDoctorProfileEdit = () => {
+    setEditingDoctorId(null);
+    setDoctorProfileForm(emptyDoctorProfileForm);
+    setDoctorImageFile(null);
+    setDoctorProfileError('');
+  };
+
+  const submitDoctorProfile = async (event) => {
+    event.preventDefault();
+    setBusyId('doctor-profile-submit');
+    setError('');
+    setSuccess('');
+    setDoctorProfileError('');
+
+    if (!doctorProfileForm.firstName.trim() || !doctorProfileForm.lastName.trim()) {
+      const message = 'Doctor first name and last name are required.';
+      setDoctorProfileError(message);
+      setError(message);
+      setBusyId(null);
+      return;
+    }
+
+    const normalizedDoctorEmail = doctorProfileForm.email.trim().toLowerCase();
+    if (!normalizedDoctorEmail) {
+      const message = 'Doctor email is required.';
+      setDoctorProfileError(message);
+      setError(message);
+      setBusyId(null);
+      return;
+    }
+
+    if (!editingDoctorId && !doctorProfileForm.loginPassword.trim()) {
+      const message = 'Doctor login password is required for new doctor registration.';
+      setDoctorProfileError(message);
+      setError(message);
+      setBusyId(null);
+      return;
+    }
+
+    try {
+      let imageUrl = doctorProfileForm.imageUrl.trim();
+
+      // If user selected an image file, upload it to Supabase first
+      if (doctorImageFile) {
+        setUploadingImage(true);
+        imageUrl = await uploadDoctorImage(doctorImageFile);
+        setUploadingImage(false);
+      }
+
+      let linkedDoctorUserId = editingDoctorId;
+
+      if (!editingDoctorId) {
+        if (!accessToken) {
+          throw new Error('Admin session expired. Please login again and try.');
+        }
+
+        const usersResponse = await fetchUsers(accessToken);
+        const refreshedUsers = Array.isArray(usersResponse?.data) ? usersResponse.data : [];
+        setUsers(refreshedUsers);
+
+        const existingUser = refreshedUsers.find(
+          (user) => user.email?.trim().toLowerCase() === normalizedDoctorEmail,
+        );
+
+        if (existingUser) {
+          if (existingUser.role !== 'DOCTOR') {
+            throw new Error('This email already belongs to a non-doctor account. Please use another email.');
+          }
+          linkedDoctorUserId = existingUser.userId;
+        } else {
+          await registerUser({
+            firstName: doctorProfileForm.firstName.trim(),
+            lastName: doctorProfileForm.lastName.trim(),
+            email: normalizedDoctorEmail,
+            phoneNumber: doctorProfileForm.phoneNumber.trim(),
+            password: doctorProfileForm.loginPassword,
+            role: 'DOCTOR',
+          });
+
+          const latestUsersResponse = await fetchUsers(accessToken);
+          const latestUsers = Array.isArray(latestUsersResponse?.data) ? latestUsersResponse.data : [];
+          setUsers(latestUsers);
+
+          const registeredDoctorUser = latestUsers.find(
+            (user) => user.email?.trim().toLowerCase() === normalizedDoctorEmail,
+          );
+
+          if (!registeredDoctorUser) {
+            throw new Error('Doctor login account was created, but user linking failed. Please refresh and try again.');
+          }
+
+          linkedDoctorUserId = registeredDoctorUser.userId;
+        }
+      }
+
+      const payload = {
+        userId: Number(linkedDoctorUserId),
+        firstName: doctorProfileForm.firstName.trim(),
+        lastName: doctorProfileForm.lastName.trim(),
+        specialty: doctorProfileForm.specialization.trim(),
+        specialization: doctorProfileForm.specialization.trim(),
+        hospital: doctorProfileForm.hospital.trim(),
+        email: normalizedDoctorEmail,
+        phoneNumber: doctorProfileForm.phoneNumber.trim(),
+        imageUrl: imageUrl,
+        availability: doctorProfileForm.availability,
+        consultationFee: Number(doctorProfileForm.consultationFee) || 2500,
+        rating: Number(doctorProfileForm.rating) || 5,
+        experienceYears: Number(doctorProfileForm.experienceYears) || 0,
+        patientCount: Number(doctorProfileForm.patientCount) || 0,
+      };
+
+      if (editingDoctorId) {
+        await updateDoctorProfile(editingDoctorId, payload);
+      } else {
+        await createDoctorProfile(payload);
+      }
+
+      setDoctorProfileForm(emptyDoctorProfileForm);
+      setDoctorImageFile(null);
+      setEditingDoctorId(null);
+      await loadDoctorProfiles(true);
+      setSuccess(
+        editingDoctorId
+          ? 'Doctor profile updated successfully.'
+          : 'Doctor profile added successfully. It will now appear in home and appointment doctor lists.',
+      );
+    } catch (err) {
+      const message = err.message || (editingDoctorId ? 'Failed to update doctor profile.' : 'Failed to create doctor profile.');
+      setDoctorProfileError(message);
+      setError(message);
+    } finally {
+      setBusyId(null);
+      setUploadingImage(false);
+    }
+  };
+
+  const removeDoctorProfile = async (doctorId) => {
+    if (!window.confirm('Delete this doctor profile?')) return;
+
+    setBusyId(doctorId);
+    setError('');
+    setSuccess('');
+    try {
+      await deleteDoctorProfile(doctorId);
+      setDoctorProfiles((prev) => prev.filter((item) => item.userId !== doctorId));
+      setSuccess('Doctor profile deleted successfully.');
+    } catch (err) {
+      setError(err.message || 'Failed to delete doctor profile.');
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const loadNotifications = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
+    setError('');
+
+    try {
+      const [listResponse, summaryResponse] = await Promise.all([
+        fetchNotifications(),
+        fetchNotificationSummary(),
+      ]);
+      setNotifications(Array.isArray(listResponse?.data) ? listResponse.data : []);
+      setNotificationSummary(summaryResponse?.data || null);
+    } catch (err) {
+      setError(err.message || 'Failed to load notifications.');
+    } finally {
+      if (!silent) setLoading(false);
+    }
+  }, []);
+
+  const triggerSendNotification = async (notificationId) => {
+    setBusyId(notificationId);
+    setError('');
+    setSuccess('');
+    try {
+      const response = await sendNotificationById(notificationId);
+      const updated = response?.data;
+      setNotifications((prev) => prev.map((item) => item.id === notificationId ? updated : item));
+      setSuccess(response?.message || 'Notification sent successfully.');
+      await loadNotifications(true);
+    } catch (err) {
+      setError(err.message || 'Failed to send notification.');
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const changeNotificationStatus = async (notificationId, status) => {
+    setBusyId(notificationId);
+    setError('');
+    setSuccess('');
+    try {
+      const response = await updateNotificationStatus(notificationId, status);
+      const updated = response?.data;
+      setNotifications((prev) => prev.map((item) => item.id === notificationId ? updated : item));
+      setSuccess(response?.message || 'Notification status updated.');
+      await loadNotifications(true);
+    } catch (err) {
+      setError(err.message || 'Failed to update notification status.');
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const removeNotification = async (notificationId) => {
+    if (!window.confirm('Delete this notification permanently?')) return;
+
+    setBusyId(notificationId);
+    setError('');
+    setSuccess('');
+    try {
+      await deleteNotificationById(notificationId);
+      setNotifications((prev) => prev.filter((item) => item.id !== notificationId));
+      setSuccess('Notification deleted successfully.');
+      await loadNotifications(true);
+    } catch (err) {
+      setError(err.message || 'Failed to delete notification.');
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+
 
   const approveAppointment = async (appointmentId) => {
     setBusyId(appointmentId);
@@ -274,7 +669,10 @@ const AdminDashboard = ({ navigate, currentUser, refreshUser }) => {
     }
     loadUsers();
     loadAppointments();
-  }, [accessToken, currentUser, loadUsers, loadAppointments, navigate]);
+    loadPayments();
+    loadNotifications(true);
+    loadDoctorProfiles(true);
+  }, [accessToken, currentUser, loadUsers, loadAppointments, loadPayments, loadNotifications, loadDoctorProfiles, navigate]);
 
   const filteredUsers = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -393,9 +791,31 @@ const AdminDashboard = ({ navigate, currentUser, refreshUser }) => {
         ...createForm,
         email: createForm.email.trim().toLowerCase(),
       });
+
+      if (createForm.role === 'DOCTOR') {
+        await createDoctorProfile({
+          firstName: createForm.firstName.trim(),
+          lastName: createForm.lastName.trim(),
+          specialty: 'General Medicine',
+          specialization: 'General Medicine',
+          hospital: 'Not Assigned',
+          email: createForm.email.trim().toLowerCase(),
+          phoneNumber: createForm.phoneNumber.trim(),
+          imageUrl: '',
+          availability: 'Available Today',
+          consultationFee: 2500,
+          rating: 5,
+          experienceYears: 0,
+          patientCount: 0,
+        });
+      }
+
       setShowCreateModal(false);
       setCreateForm(emptyCreateForm);
       await loadUsers(true);
+      if (createForm.role === 'DOCTOR') {
+        await loadDoctorProfiles(true);
+      }
       setSuccess(`${createForm.role.toLowerCase()} account created successfully.`);
     } catch (err) {
       const message = err.message || 'Failed to create user.';
@@ -605,21 +1025,99 @@ const AdminDashboard = ({ navigate, currentUser, refreshUser }) => {
             ) : null}
 
             {!loading && activeTab === 'doctors' ? (
-              <div className="rounded-2xl bg-white p-6 shadow-lg">
-                <h3 className="mb-4 text-lg font-bold text-gray-800">Doctor Accounts</h3>
-                <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-                  {doctors.length === 0 ? <p className="text-sm text-slate-500">No doctor accounts found.</p> : doctors.map((doctor) => (
-                    <div key={doctor.userId} className="rounded-xl border p-4">
-                      <div className="mb-3 flex items-center justify-between"><h4 className="font-bold text-gray-800">{fullName(doctor)}</h4><span className={`rounded-full px-2 py-1 text-xs font-medium ${doctor.active ? 'bg-green-100 text-green-700' : 'bg-rose-100 text-rose-700'}`}>{doctor.active ? 'active' : 'suspended'}</span></div>
-                      <p className="text-sm text-teal-600">{doctor.email}</p>
-                      <p className="mt-2 text-sm text-gray-500">Phone: {doctor.phoneNumber || 'N/A'}</p>
-                      <p className="mt-1 text-sm text-gray-500">OTP: {doctor.otpVerified ? 'Verified' : 'Pending'}</p>
-                      <div className="mt-4 flex gap-2">
-                        <button type="button" onClick={() => openUser(doctor.userId)} className="flex-1 rounded-lg bg-teal-600 py-2 font-medium text-white hover:bg-teal-700">View</button>
-                        <button type="button" onClick={() => startEditUser(doctor.userId)} className="flex-1 rounded-lg border border-amber-300 py-2 font-medium text-amber-700 hover:bg-amber-50">Edit</button>
+              <div className="space-y-6">
+                <div className="rounded-2xl bg-white p-6 shadow-lg">
+                  <div className="mb-4 flex items-center justify-between">
+                    <h3 className="text-lg font-bold text-gray-800">Add Doctor Profile</h3>
+                    <button
+                      type="button"
+                      onClick={() => loadDoctorProfiles()}
+                      className="rounded-lg border border-teal-200 px-4 py-2 text-sm font-semibold text-teal-700 hover:bg-teal-50"
+                    >
+                      Refresh Profiles
+                    </button>
+                  </div>
+                  {editingDoctorId ? (
+                    <div className="mb-4 flex items-center justify-between rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                      <span>You are editing doctor profile #{editingDoctorId}.</span>
+                      <button
+                        type="button"
+                        onClick={cancelDoctorProfileEdit}
+                        className="font-semibold text-amber-900 hover:text-amber-950"
+                      >
+                        Cancel Edit
+                      </button>
+                    </div>
+                  ) : null}
+                  <p className="mb-4 text-sm text-gray-500">Create full doctor records with image and details. These records are used by home and appointment pages.</p>
+                  <form onSubmit={submitDoctorProfile} className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+                    <input name="firstName" value={doctorProfileForm.firstName} onChange={handleDoctorProfileChange} placeholder="First name" className="rounded-lg border px-4 py-2 outline-none focus:ring-2 focus:ring-teal-300" />
+                    <input name="lastName" value={doctorProfileForm.lastName} onChange={handleDoctorProfileChange} placeholder="Last name" className="rounded-lg border px-4 py-2 outline-none focus:ring-2 focus:ring-teal-300" />
+                    <input name="specialization" value={doctorProfileForm.specialization} onChange={handleDoctorProfileChange} placeholder="Specialization" className="rounded-lg border px-4 py-2 outline-none focus:ring-2 focus:ring-teal-300" />
+                    <input name="hospital" value={doctorProfileForm.hospital} onChange={handleDoctorProfileChange} placeholder="Hospital" className="rounded-lg border px-4 py-2 outline-none focus:ring-2 focus:ring-teal-300" />
+                    <input name="email" type="email" value={doctorProfileForm.email} onChange={handleDoctorProfileChange} placeholder="Doctor login email" className="rounded-lg border px-4 py-2 outline-none focus:ring-2 focus:ring-teal-300" />
+                    {!editingDoctorId ? <div className="space-y-2"><input name="loginPassword" type="text" value={doctorProfileForm.loginPassword} onChange={handleDoctorProfileChange} placeholder="Doctor login password" className="w-full rounded-lg border px-4 py-2 outline-none focus:ring-2 focus:ring-teal-300" /><div className="flex items-center justify-between gap-2"><p className="text-xs text-slate-500">Use at least 8 chars with A-Z, a-z, number and symbol.</p><button type="button" onClick={() => setDoctorProfileForm((prev) => ({ ...prev, loginPassword: generateDoctorPassword() }))} className="rounded-md border border-teal-300 px-3 py-1 text-xs font-semibold text-teal-700 hover:bg-teal-50">Auto Generate</button></div></div> : null}
+                    <input name="phoneNumber" value={doctorProfileForm.phoneNumber} onChange={handleDoctorProfileChange} placeholder="Phone number" className="rounded-lg border px-4 py-2 outline-none focus:ring-2 focus:ring-teal-300" />
+                    <div className="col-span-1 md:col-span-2">
+                      <label className="mb-2 block text-sm font-semibold text-gray-700">Doctor Image</label>
+                      <div className="flex gap-2">
+                        <input type="file" accept="image/*" onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) setDoctorImageFile(file);
+                        }} placeholder="Upload image from gallery" className="flex-1 rounded-lg border px-4 py-2 file:mr-3 file:rounded file:border-0 file:bg-teal-500 file:px-3 file:py-1 file:text-white file:cursor-pointer outline-none focus:ring-2 focus:ring-teal-300" />
+                        {doctorImageFile && <span className="flex items-center rounded bg-green-100 px-3 py-1 text-xs text-green-700 font-semibold">✓ {doctorImageFile.name}</span>}
+                      </div>
+                      <p className="mt-1 text-xs text-gray-500">Or enter image URL below if you prefer</p>
+                    </div>
+                    <input name="imageUrl" value={doctorProfileForm.imageUrl} onChange={handleDoctorProfileChange} placeholder="Doctor image URL (optional if file selected)" className="rounded-lg border px-4 py-2 outline-none focus:ring-2 focus:ring-teal-300" />
+                    <select name="availability" value={doctorProfileForm.availability} onChange={handleDoctorProfileChange} className="rounded-lg border px-4 py-2 outline-none focus:ring-2 focus:ring-teal-300">
+                      <option value="Available Today">Available Today</option>
+                      <option value="Available Tomorrow">Available Tomorrow</option>
+                      <option value="On Leave">On Leave</option>
+                    </select>
+                    <input type="number" min="0" name="consultationFee" value={doctorProfileForm.consultationFee} onChange={handleDoctorProfileChange} placeholder="Consultation Fee" className="rounded-lg border px-4 py-2 outline-none focus:ring-2 focus:ring-teal-300" />
+                    <input type="number" min="0" max="5" step="0.1" name="rating" value={doctorProfileForm.rating} onChange={handleDoctorProfileChange} placeholder="Rating" className="rounded-lg border px-4 py-2 outline-none focus:ring-2 focus:ring-teal-300" />
+                    <input type="number" min="0" name="experienceYears" value={doctorProfileForm.experienceYears} onChange={handleDoctorProfileChange} placeholder="Experience years" className="rounded-lg border px-4 py-2 outline-none focus:ring-2 focus:ring-teal-300" />
+                    <input type="number" min="0" name="patientCount" value={doctorProfileForm.patientCount} onChange={handleDoctorProfileChange} placeholder="Patient count" className="rounded-lg border px-4 py-2 outline-none focus:ring-2 focus:ring-teal-300" />
+                    <div className="md:col-span-2 lg:col-span-3">
+                      {doctorProfileError ? <p className="mb-3 text-sm text-rose-600">{doctorProfileError}</p> : null}
+                      <div className="flex flex-wrap gap-3">
+                        <button type="submit" disabled={busyId === 'doctor-profile-submit' || uploadingImage} className="rounded-lg bg-teal-600 px-6 py-2 font-semibold text-white hover:bg-teal-700 disabled:opacity-50">
+                          {uploadingImage ? 'Uploading image...' : busyId === 'doctor-profile-submit' ? 'Saving...' : editingDoctorId ? 'Update Doctor Profile' : 'Add Doctor Profile'}
+                        </button>
+                        {editingDoctorId ? (
+                          <button
+                            type="button"
+                            onClick={cancelDoctorProfileEdit}
+                            className="rounded-lg border border-slate-300 px-6 py-2 font-semibold text-slate-700 hover:bg-slate-50"
+                          >
+                            Cancel
+                          </button>
+                        ) : null}
                       </div>
                     </div>
-                  ))}
+                  </form>
+                </div>
+
+                <div className="rounded-2xl bg-white p-6 shadow-lg">
+                  <h3 className="mb-4 text-lg font-bold text-gray-800">Doctor Profiles</h3>
+                  <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+                    {doctorProfiles.length === 0 ? <p className="text-sm text-slate-500">No doctor profiles found.</p> : doctorProfiles.map((doctor) => (
+                      <div key={doctor.userId} className="rounded-xl border p-4">
+                        <img src={doctor.imageUrl || `https://i.pravatar.cc/200?u=${doctor.userId}`} alt={`${doctor.firstName} ${doctor.lastName}`} className="mb-3 h-40 w-full rounded-lg object-cover" />
+                        <div className="mb-2 flex items-center justify-between"><h4 className="font-bold text-gray-800">Dr. {doctor.firstName} {doctor.lastName}</h4><span className="rounded-full bg-teal-100 px-2 py-1 text-xs font-medium text-teal-700">{doctor.availability || 'Available Today'}</span></div>
+                        <p className="text-sm text-teal-600">{doctor.specialization || doctor.specialty || 'General Medicine'}</p>
+                        <p className="mt-1 text-sm text-gray-500">Hospital: {doctor.hospital || 'N/A'}</p>
+                        <p className="mt-1 text-sm text-gray-500">Email: {doctor.email || 'N/A'}</p>
+                        <p className="mt-1 text-sm text-gray-500">Phone: {doctor.phoneNumber || 'N/A'}</p>
+                        <p className="mt-1 text-sm text-gray-500">Fee: LKR {doctor.consultationFee || 0}</p>
+                        <div className="mt-4 flex gap-2">
+                          <button type="button" onClick={() => startEditDoctorProfile(doctor)} className="flex-1 rounded-lg border border-teal-300 py-2 font-medium text-teal-700 hover:bg-teal-50">Edit</button>
+                          <button type="button" onClick={() => removeDoctorProfile(doctor.userId)} disabled={busyId === doctor.userId} className="flex-1 rounded-lg border border-rose-300 py-2 font-medium text-rose-700 hover:bg-rose-50 disabled:opacity-50">Delete</button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
             ) : null}
@@ -693,7 +1191,215 @@ const AdminDashboard = ({ navigate, currentUser, refreshUser }) => {
                 </div>
               </div>
             ) : null}
-            {!loading && activeTab === 'payments' ? <Placeholder title="Transactions not connected yet" text="The old payment table was mock data, so it has been replaced with a safe placeholder until payment APIs exist." /> : null}
+            
+            {!loading && activeTab === 'payments' ? (
+                  <div className="rounded-2xl bg-white shadow-lg">
+                  <div className="border-b px-6 py-4 flex justify-between items-center">
+                  <h3 className="text-lg font-bold text-gray-800">Payment Transactions</h3>
+                  <button
+                onClick={loadPayments}
+              className="rounded-lg bg-teal-600 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-700"
+              >
+                 🔄 Refresh
+               </button>
+               </div>
+
+            <div className="overflow-x-auto">
+            <table className="w-full">
+            <thead className="bg-gray-50">
+            <tr>
+            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">ID</th>
+            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">Appointment</th>
+            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">Amount</th>
+            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">Hospital (30%)</th>
+            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">Doctor (70%)</th>
+            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">Method</th>
+            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">Status</th>
+            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">Actions</th>
+          </tr>
+        </thead>
+
+        <tbody className="divide-y divide-gray-200">
+          {payments.length === 0 ? (
+            <tr>
+              <td colSpan="5" className="px-6 py-8 text-center text-sm text-gray-500">
+                No transactions found
+              </td>
+            </tr>
+          ) : (
+            payments.map((p) => (
+              <tr key={p.id || p.paymentId} className="hover:bg-gray-50">
+                <td className="px-6 py-4 text-sm font-medium text-gray-800">
+                  #{p.id || p.paymentId}
+                </td>
+                <td className="px-6 py-4 text-sm text-gray-600">
+                  Appointment #{p.appointmentId}
+                </td>
+                <td className="px-6 py-4 text-sm font-semibold text-teal-700">
+                  LKR {p.amount}
+                </td>
+                <td className="px-6 py-4 text-sm text-emerald-700 font-semibold">
+                 {p.hospitalShare != null ? `LKR ${p.hospitalShare}` : "N/A"}
+                </td>
+
+                <td className="px-6 py-4 text-sm text-indigo-700 font-semibold">
+                 {p.doctorShare != null ? `LKR ${p.doctorShare}` : "N/A"}
+                </td>
+                <td className="px-6 py-4 text-sm text-gray-600">
+                  
+                     {p.method === "PAYHERE_TEST"
+                       ? "PayHere (Test)"
+                        : p.method}
+
+                </td>
+                <td className="px-6 py-4">
+                  <span
+                    className={`rounded-full px-3 py-1 text-xs font-medium ${
+                      p.status === "SUCCESS"
+                        ? "bg-green-100 text-green-700"
+                        : "bg-yellow-100 text-yellow-700"
+                    }`}
+                  >
+                    {p.status}
+                  </span>
+                </td>
+                <td className="px-6 py-4 flex gap-2">
+                  
+                 {/* Approve - ONLY if PENDING */}
+                
+                  {p.status === "PENDING" && (
+                  <button
+                 onClick={() => approvePayment(p.id)}
+                 className="px-3 py-1 text-xs font-semibold rounded-md bg-green-100 text-green-700 hover:bg-green-200"
+                >
+               ✅ Approve
+              </button>
+              )}
+ 
+
+                {/* Edit Payment  */}
+                <button
+                 onClick={() => openEditPayment(p)}
+                 className="px-3 py-1 text-xs font-semibold rounded-md bg-amber-100 text-amber-700 hover:bg-amber-200"
+                >
+                ✏️ Edit
+                </button>          
+
+                 {/* Delete Payment */}
+                  <button
+                  onClick={() => deletePayment(p.id)}
+                  className="px-3 py-1 text-xs font-semibold rounded-md bg-red-100 text-red-700 hover:bg-red-200"
+                 >
+                🗑️ Delete
+               </button>
+               </td>
+               </tr>
+            ))
+             )}
+               </tbody>
+             </table>
+             </div>
+            </div>
+           ) : null}
+
+            {!loading && activeTab === 'notifications' ? (
+              <div className="rounded-2xl bg-white shadow-lg">
+                <div className="flex flex-col gap-4 border-b border-gray-200 px-6 py-4 md:flex-row md:items-center md:justify-between">
+                  <div>
+                    <h3 className="text-lg font-bold text-gray-800">Notification Management</h3>
+                    <p className="mt-1 text-sm text-gray-500">Only admins can manage notification delivery and status updates.</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => loadNotifications()}
+                    className="rounded-lg bg-teal-600 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-700"
+                  >
+                    Refresh Notifications
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 gap-4 border-b border-gray-100 p-6 md:grid-cols-5">
+                  <div className="rounded-xl bg-slate-50 p-4"><p className="text-xs text-gray-500">Total</p><p className="mt-1 text-xl font-bold text-gray-800">{notificationSummary?.totalNotifications ?? notifications.length}</p></div>
+                  <div className="rounded-xl bg-yellow-50 p-4"><p className="text-xs text-gray-500">Queued</p><p className="mt-1 text-xl font-bold text-yellow-700">{notificationSummary?.queuedNotifications ?? 0}</p></div>
+                  <div className="rounded-xl bg-green-50 p-4"><p className="text-xs text-gray-500">Sent</p><p className="mt-1 text-xl font-bold text-green-700">{notificationSummary?.sentNotifications ?? 0}</p></div>
+                  <div className="rounded-xl bg-rose-50 p-4"><p className="text-xs text-gray-500">Failed</p><p className="mt-1 text-xl font-bold text-rose-700">{notificationSummary?.failedNotifications ?? 0}</p></div>
+                  <div className="rounded-xl bg-red-50 p-4"><p className="text-xs text-gray-500">Critical</p><p className="mt-1 text-xl font-bold text-red-700">{notificationSummary?.criticalNotifications ?? 0}</p></div>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">ID</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">Recipient</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">Subject</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">Channel</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">Status</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200">
+                      {notifications.length === 0 ? (
+                        <tr><td colSpan="6" className="px-6 py-8 text-center text-sm text-gray-500">No notifications found.</td></tr>
+                      ) : notifications.map((item) => (
+                        <tr key={item.id} className="hover:bg-gray-50">
+                          <td className="px-6 py-4 text-sm font-semibold text-gray-800">#{item.id}</td>
+                          <td className="px-6 py-4 text-sm text-gray-600">
+                            <p>{item.recipientName || 'Unknown'}</p>
+                            <p className="text-xs text-gray-500">{item.recipientEmail || item.recipientPhone || 'No contact'}</p>
+                          </td>
+                          <td className="px-6 py-4 text-sm text-gray-700">{item.subject || 'No subject'}</td>
+                          <td className="px-6 py-4 text-xs font-semibold text-teal-700">{item.channel || 'N/A'}</td>
+                          <td className="px-6 py-4">
+                            <span className={`rounded-full px-3 py-1 text-xs font-medium ${item.status === 'SENT' ? 'bg-green-100 text-green-700' : item.status === 'FAILED' ? 'bg-rose-100 text-rose-700' : 'bg-yellow-100 text-yellow-700'}`}>
+                              {item.status || 'QUEUED'}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="flex flex-wrap gap-2">
+                              <button
+                                type="button"
+                                onClick={() => triggerSendNotification(item.id)}
+                                disabled={busyId === item.id}
+                                className="rounded-md bg-blue-100 px-3 py-1 text-xs font-semibold text-blue-700 hover:bg-blue-200 disabled:opacity-50"
+                              >
+                                Send
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => changeNotificationStatus(item.id, 'QUEUED')}
+                                disabled={busyId === item.id}
+                                className="rounded-md bg-yellow-100 px-3 py-1 text-xs font-semibold text-yellow-700 hover:bg-yellow-200 disabled:opacity-50"
+                              >
+                                Mark Queued
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => changeNotificationStatus(item.id, 'FAILED')}
+                                disabled={busyId === item.id}
+                                className="rounded-md bg-rose-100 px-3 py-1 text-xs font-semibold text-rose-700 hover:bg-rose-200 disabled:opacity-50"
+                              >
+                                Mark Failed
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => removeNotification(item.id)}
+                                disabled={busyId === item.id}
+                                className="rounded-md bg-red-100 px-3 py-1 text-xs font-semibold text-red-700 hover:bg-red-200 disabled:opacity-50"
+                              >
+                                Delete
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ) : null}
+
+
             {!loading && activeTab === 'reports' ? <Placeholder title="Reports module pending" text="There is no reports endpoint in the current backend, so this section stays as a placeholder." /> : null}
             {!loading && activeTab === 'settings' ? <Placeholder title="Settings module pending" text="Admin settings are not backed by the API yet. The live connection now covers user management only." /> : null}
           </main>
@@ -913,7 +1619,111 @@ const AdminDashboard = ({ navigate, currentUser, refreshUser }) => {
           </div>
         </div>
       ) : null}
+
+
+      {showEditPaymentModal && selectedPayment && (
+  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+    <div className="w-full max-w-md rounded-2xl bg-white p-6">
+
+      {/* Header */}
+      <div className="mb-4 flex items-center justify-between">
+        <h3 className="text-xl font-bold text-gray-800">Edit Payment</h3>
+        <button
+          onClick={() => setShowEditPaymentModal(false)}
+          className="text-gray-400 hover:text-gray-600"
+        >
+          ❌
+        </button>
+      </div>
+
+      {/* Info */}
+      <div className="mb-4 text-sm text-gray-600">
+        <p><b>Payment ID:</b> #{selectedPayment.id}</p>
+        <p><b>Appointment:</b> #{selectedPayment.appointmentId}</p>
+      </div>
+
+      {/* Form */}
+      <form onSubmit={submitEditPayment} className="space-y-4">
+
+        {/* Amount */}
+        <div>
+          <label className="block text-sm font-medium">Amount (LKR)</label>
+          <input
+            type="number"
+            value={editPaymentForm.amount}
+            onChange={(e) =>
+              setEditPaymentForm({
+                ...editPaymentForm,
+                amount: e.target.value,
+              })
+            }
+            className="w-full rounded-lg border px-4 py-2"
+            required
+          />
+        </div>
+
+        {/* Method */}
+        <div>
+          <label className="block text-sm font-medium">Method</label>
+          <select
+            value={editPaymentForm.method}
+            onChange={(e) =>
+              setEditPaymentForm({
+                ...editPaymentForm,
+                method: e.target.value,
+              })
+            }
+            className="w-full rounded-lg border px-4 py-2"
+          >
+            <option value="PAYHERE_TEST">PayHere</option>
+            <option value="CASH">Cash</option>
+            <option value="ADMIN_UPDATED">Admin Updated</option>
+          </select>
+        </div>
+
+        {/* Status */}
+        <div>
+          <label className="block text-sm font-medium">Status</label>
+          <select
+            value={editPaymentForm.status}
+            onChange={(e) =>
+              setEditPaymentForm({
+                ...editPaymentForm,
+                status: e.target.value,
+              })
+            }
+            className="w-full rounded-lg border px-4 py-2"
+          >
+            <option value="PENDING">Pending</option>
+            <option value="SUCCESS">Success</option>
+            <option value="FAILED">Failed</option>
+          </select>
+        </div>
+
+        {/* Actions */}
+        <div className="flex justify-end gap-3">
+          <button
+            type="button"
+            onClick={() => setShowEditPaymentModal(false)}
+            className="rounded-lg border px-4 py-2"
+          >
+            Cancel
+          </button>
+
+          <button
+            type="submit"
+            className="rounded-lg bg-amber-500 px-6 py-2 text-white font-semibold hover:bg-amber-600"
+          >
+            Save Changes
+          </button>
+        </div>
+
+      </form>
     </div>
+  </div>
+)}
+
+ </div>
   );
 };
 
