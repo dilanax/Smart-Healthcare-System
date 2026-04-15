@@ -63,6 +63,13 @@ public class DoctorController {
                     doctor.setFirstName(doctorDetails.getFirstName());
                     doctor.setLastName(doctorDetails.getLastName());
                     doctor.setSpecialty(doctorDetails.getSpecialty());
+                    doctor.setSpecialization(doctorDetails.getSpecialization());
+                    doctor.setHospital(doctorDetails.getHospital());
+                    doctor.setEmail(doctorDetails.getEmail());
+                    doctor.setPhoneNumber(doctorDetails.getPhoneNumber());
+                    doctor.setImageUrl(doctorDetails.getImageUrl());
+                    doctor.setAvailability(doctorDetails.getAvailability());
+                    doctor.setConsultationFee(doctorDetails.getConsultationFee());
                     doctor.setRating(doctorDetails.getRating());
                     doctor.setExperienceYears(doctorDetails.getExperienceYears());
                     doctor.setPatientCount(doctorDetails.getPatientCount());

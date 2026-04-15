@@ -141,9 +141,9 @@ const OtpPage = ({ navigate, refreshUser }) => {
       refreshUser();
       setSuccess('OTP verified successfully. Logging you in...');
       
-      // Auto-navigate to profile instead of home page so you can see it work!
+      const redirectPath = userData.role === 'ADMIN' ? '/admin' : userData.role === 'DOCTOR' ? '/doctor' : '/';
       setTimeout(() => {
-        navigate(userData.role === 'ADMIN' ? '/admin' : '/profile');
+        navigate(redirectPath);
       }, 1500);
 
     } catch (submitError) {

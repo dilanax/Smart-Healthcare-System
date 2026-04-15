@@ -8,6 +8,7 @@ import com.healthcare.appointment.model.AppointmentStatus;
 import com.healthcare.appointment.repo.AppointmentRepository;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -45,6 +46,20 @@ public class AppointmentService {
 
     public List<AppointmentResponseDto> getAppointmentsByPatientId(Long patientId) {
         return appointmentRepository.findByPatientId(patientId)
+                .stream()
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
+    }
+
+    public List<AppointmentResponseDto> getAppointmentsByDoctorId(Long doctorId) {
+        return appointmentRepository.findByDoctorId(doctorId)
+                .stream()
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
+    }
+
+    public List<AppointmentResponseDto> getAppointmentsByDoctorIdAndDate(Long doctorId, LocalDate appointmentDate) {
+        return appointmentRepository.findByDoctorIdAndAppointmentDate(doctorId, appointmentDate)
                 .stream()
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());

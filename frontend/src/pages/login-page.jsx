@@ -138,7 +138,8 @@ const LoginPage = ({ navigate, refreshUser }) => {
         storeUser(data);
         refreshUser();
         setSuccess(message || 'Login successful');
-        setTimeout(() => navigate(data.role === 'ADMIN' ? '/admin' : '/'), 1500);
+        const redirectPath = data.role === 'ADMIN' ? '/admin' : data.role === 'DOCTOR' ? '/doctor' : '/';
+        setTimeout(() => navigate(redirectPath), 1500);
       } else {
         setError(message || 'Login failed. Please try again.');
       }
