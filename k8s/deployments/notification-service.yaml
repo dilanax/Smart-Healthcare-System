@@ -1,0 +1,57 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: notification-service
+  labels:
+    app: healthcare-notification
+spec:
+  ports:
+    - port: 8084
+      targetPort: 8084
+  selector:
+    app: healthcare-notification
+  type: ClusterIP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: notification-service
+  labels:
+    app: healthcare-notification
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: healthcare-notification
+  template:
+    metadata:
+      labels:
+        app: healthcare-notification
+    spec:
+      containers:
+        - name: notification-service
+          image: healthcare/notification-service:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8084
+          env:
+            - name: SPRING_DATASOURCE_URL
+              value: jdbc:mysql://mysql:3306/healthcare_db?createDatabaseIfNotExist=true
+            - name: SPRING_DATASOURCE_USERNAME
+              value: healthcare
+            - name: SPRING_DATASOURCE_PASSWORD
+              value: "123456"
+            - name: SERVER_PORT
+              value: "8084"
+            - name: SPRING_MAIL_HOST
+              value: smtp.gmail.com
+            - name: SPRING_MAIL_PORT
+              value: "587"
+            - name: SPRING_MAIL_USERNAME
+              value: dilanavishka183@gmail.com
+            - name: SPRING_MAIL_PASSWORD
+              value: pllb iekj knmu scuc
+            - name: SPRING_MAIL_PROPERTIES_MAIL_SMTP_AUTH
+              value: "true"
+            - name: SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE
+              value: "true"

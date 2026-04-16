@@ -1,0 +1,45 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: appointment-service
+  labels:
+    app: healthcare-appointment
+spec:
+  ports:
+    - port: 8085
+      targetPort: 8085
+  selector:
+    app: healthcare-appointment
+  type: ClusterIP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: appointment-service
+  labels:
+    app: healthcare-appointment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: healthcare-appointment
+  template:
+    metadata:
+      labels:
+        app: healthcare-appointment
+    spec:
+      containers:
+        - name: appointment-service
+          image: healthcare/appointment-service:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8085
+          env:
+            - name: SPRING_DATASOURCE_URL
+              value: jdbc:mysql://mysql:3306/healthcare_db?createDatabaseIfNotExist=true
+            - name: SPRING_DATASOURCE_USERNAME
+              value: healthcare
+            - name: SPRING_DATASOURCE_PASSWORD
+              value: "123456"
+            - name: SERVER_PORT
+              value: "8085"

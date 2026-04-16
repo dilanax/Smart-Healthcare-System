@@ -1,0 +1,442 @@
+# Sample Kubernetes manifests for Smart Healthcare System
+# Note: Kubernetes does not build Docker images. Build images locally and push to a registry,
+# or use a local cluster image loader before applying these manifests.
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mysql-data-pvc
+  labels:
+    app: healthcare-mysql
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mysql
+  labels:
+    app: healthcare-mysql
+spec:
+  ports:
+    - port: 3306
+      targetPort: 3306
+      name: mysql
+  selector:
+    app: healthcare-mysql
+  type: ClusterIP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mysql
+  labels:
+    app: healthcare-mysql
+spec:
+  selector:
+    matchLabels:
+      app: healthcare-mysql
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: healthcare-mysql
+    spec:
+      containers:
+        - name: mysql
+          image: mysql:8.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 3306
+          env:
+            - name: MYSQL_ROOT_PASSWORD
+              value: root
+            - name: MYSQL_DATABASE
+              value: healthcare_db
+            - name: MYSQL_USER
+              value: healthcare
+            - name: MYSQL_PASSWORD
+              value: "123456"
+          volumeMounts:
+            - name: mysql-data
+              mountPath: /var/lib/mysql
+          livenessProbe:
+            exec:
+              command:
+                - mysqladmin
+                - ping
+                - -h
+                - localhost
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          readinessProbe:
+            exec:
+              command:
+                - mysqladmin
+                - ping
+                - -h
+                - localhost
+            initialDelaySeconds: 15
+            periodSeconds: 10
+      volumes:
+        - name: mysql-data
+          persistentVolumeClaim:
+            claimName: mysql-data-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: auth-service
+  labels:
+    app: healthcare-auth
+spec:
+  ports:
+    - port: 8081
+      targetPort: 8081
+  selector:
+    app: healthcare-auth
+  type: ClusterIP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: auth-service
+  labels:
+    app: healthcare-auth
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: healthcare-auth
+  template:
+    metadata:
+      labels:
+        app: healthcare-auth
+    spec:
+      containers:
+        - name: auth-service
+          image: healthcare/auth-service:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8081
+          env:
+            - name: SPRING_DATASOURCE_URL
+              value: jdbc:mysql://mysql:3306/healthcare_db?createDatabaseIfNotExist=true
+            - name: SPRING_DATASOURCE_USERNAME
+              value: healthcare
+            - name: SPRING_DATASOURCE_PASSWORD
+              value: "123456"
+            - name: SERVER_PORT
+              value: "8081"
+            - name: SPRING_MAIL_HOST
+              value: smtp.gmail.com
+            - name: SPRING_MAIL_PORT
+              value: "587"
+            - name: SPRING_MAIL_USERNAME
+              value: dilanavishka183@gmail.com
+            - name: SPRING_MAIL_PASSWORD
+              value: pllb iekj knmu scuc
+            - name: SPRING_MAIL_PROPERTIES_MAIL_SMTP_AUTH
+              value: "true"
+            - name: SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE
+              value: "true"
+            - name: APP_JWT_SECRET
+              value: my-super-secret-key-change-this-in-production
+            - name: APP_JWT_EXPIRATION_HOURS
+              value: "8"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: doctor-service
+  labels:
+    app: healthcare-doctor
+spec:
+  ports:
+    - port: 8082
+      targetPort: 8082
+  selector:
+    app: healthcare-doctor
+  type: ClusterIP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: doctor-service
+  labels:
+    app: healthcare-doctor
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: healthcare-doctor
+  template:
+    metadata:
+      labels:
+        app: healthcare-doctor
+    spec:
+      containers:
+        - name: doctor-service
+          image: healthcare/doctor-service:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8082
+          env:
+            - name: SPRING_DATASOURCE_URL
+              value: jdbc:mysql://mysql:3306/healthcare_db?createDatabaseIfNotExist=true
+            - name: SPRING_DATASOURCE_USERNAME
+              value: healthcare
+            - name: SPRING_DATASOURCE_PASSWORD
+              value: "123456"
+            - name: SERVER_PORT
+              value: "8082"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: patient-service
+  labels:
+    app: healthcare-patient
+spec:
+  ports:
+    - port: 8083
+      targetPort: 8083
+  selector:
+    app: healthcare-patient
+  type: ClusterIP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: patient-service
+  labels:
+    app: healthcare-patient
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: healthcare-patient
+  template:
+    metadata:
+      labels:
+        app: healthcare-patient
+    spec:
+      containers:
+        - name: patient-service
+          image: healthcare/patient-service:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8083
+          env:
+            - name: SPRING_DATASOURCE_URL
+              value: jdbc:mysql://mysql:3306/healthcare_db?createDatabaseIfNotExist=true
+            - name: SPRING_DATASOURCE_USERNAME
+              value: healthcare
+            - name: SPRING_DATASOURCE_PASSWORD
+              value: "123456"
+            - name: SERVER_PORT
+              value: "8083"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: notification-service
+  labels:
+    app: healthcare-notification
+spec:
+  ports:
+    - port: 8084
+      targetPort: 8084
+  selector:
+    app: healthcare-notification
+  type: ClusterIP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: notification-service
+  labels:
+    app: healthcare-notification
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: healthcare-notification
+  template:
+    metadata:
+      labels:
+        app: healthcare-notification
+    spec:
+      containers:
+        - name: notification-service
+          image: healthcare/notification-service:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8084
+          env:
+            - name: SPRING_DATASOURCE_URL
+              value: jdbc:mysql://mysql:3306/healthcare_db?createDatabaseIfNotExist=true
+            - name: SPRING_DATASOURCE_USERNAME
+              value: healthcare
+            - name: SPRING_DATASOURCE_PASSWORD
+              value: "123456"
+            - name: SERVER_PORT
+              value: "8084"
+            - name: SPRING_MAIL_HOST
+              value: smtp.gmail.com
+            - name: SPRING_MAIL_PORT
+              value: "587"
+            - name: SPRING_MAIL_USERNAME
+              value: dilanavishka183@gmail.com
+            - name: SPRING_MAIL_PASSWORD
+              value: pllb iekj knmu scuc
+            - name: SPRING_MAIL_PROPERTIES_MAIL_SMTP_AUTH
+              value: "true"
+            - name: SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE
+              value: "true"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: appointment-service
+  labels:
+    app: healthcare-appointment
+spec:
+  ports:
+    - port: 8085
+      targetPort: 8085
+  selector:
+    app: healthcare-appointment
+  type: ClusterIP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: appointment-service
+  labels:
+    app: healthcare-appointment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: healthcare-appointment
+  template:
+    metadata:
+      labels:
+        app: healthcare-appointment
+    spec:
+      containers:
+        - name: appointment-service
+          image: healthcare/appointment-service:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8085
+          env:
+            - name: SPRING_DATASOURCE_URL
+              value: jdbc:mysql://mysql:3306/healthcare_db?createDatabaseIfNotExist=true
+            - name: SPRING_DATASOURCE_USERNAME
+              value: healthcare
+            - name: SPRING_DATASOURCE_PASSWORD
+              value: "123456"
+            - name: SERVER_PORT
+              value: "8085"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: payment-service
+  labels:
+    app: healthcare-payment
+spec:
+  ports:
+    - port: 8086
+      targetPort: 8086
+  selector:
+    app: healthcare-payment
+  type: ClusterIP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: payment-service
+  labels:
+    app: healthcare-payment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: healthcare-payment
+  template:
+    metadata:
+      labels:
+        app: healthcare-payment
+    spec:
+      containers:
+        - name: payment-service
+          image: healthcare/payment-service:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8086
+          env:
+            - name: SPRING_DATASOURCE_URL
+              value: jdbc:mysql://mysql:3306/healthcare_db?createDatabaseIfNotExist=true
+            - name: SPRING_DATASOURCE_USERNAME
+              value: healthcare
+            - name: SPRING_DATASOURCE_PASSWORD
+              value: "123456"
+            - name: SERVER_PORT
+              value: "8086"
+            - name: PAYHERE_MERCHANT_ID
+              value: "1235016"
+            - name: PAYHERE_MERCHANT_SECRET
+              value: MTA3ODk5Njg4MzM2Mzk1OTcwNjkzMDkyMzE5NTUyMTA2NzQ5OTk2
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend
+  labels:
+    app: healthcare-frontend
+spec:
+  ports:
+    - port: 80
+      targetPort: 5173
+      protocol: TCP
+  selector:
+    app: healthcare-frontend
+  type: NodePort
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+  labels:
+    app: healthcare-frontend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: healthcare-frontend
+  template:
+    metadata:
+      labels:
+        app: healthcare-frontend
+    spec:
+      containers:
+        - name: frontend
+          image: healthcare/frontend:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 5173
+          env:
+            - name: VITE_API_BASE_URL
+              value: http://auth-service:8081
+            - name: VITE_NOTIFICATION_API_BASE_URL
+              value: http://notification-service:8084
+            - name: VITE_PAYMENT_API_BASE_URL
+              value: http://payment-service:8086

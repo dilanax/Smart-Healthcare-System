@@ -1,0 +1,49 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: payment-service
+  labels:
+    app: healthcare-payment
+spec:
+  ports:
+    - port: 8086
+      targetPort: 8086
+  selector:
+    app: healthcare-payment
+  type: ClusterIP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: payment-service
+  labels:
+    app: healthcare-payment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: healthcare-payment
+  template:
+    metadata:
+      labels:
+        app: healthcare-payment
+    spec:
+      containers:
+        - name: payment-service
+          image: healthcare/payment-service:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8086
+          env:
+            - name: SPRING_DATASOURCE_URL
+              value: jdbc:mysql://mysql:3306/healthcare_db?createDatabaseIfNotExist=true
+            - name: SPRING_DATASOURCE_USERNAME
+              value: healthcare
+            - name: SPRING_DATASOURCE_PASSWORD
+              value: "123456"
+            - name: SERVER_PORT
+              value: "8086"
+            - name: PAYHERE_MERCHANT_ID
+              value: "1235016"
+            - name: PAYHERE_MERCHANT_SECRET
+              value: MTA3ODk5Njg4MzM2Mzk1OTcwNjkzMDkyMzE5NTUyMTA2NzQ5OTk2

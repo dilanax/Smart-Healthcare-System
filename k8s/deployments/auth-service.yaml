@@ -1,0 +1,61 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: auth-service
+  labels:
+    app: healthcare-auth
+spec:
+  ports:
+    - port: 8081
+      targetPort: 8081
+  selector:
+    app: healthcare-auth
+  type: ClusterIP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: auth-service
+  labels:
+    app: healthcare-auth
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: healthcare-auth
+  template:
+    metadata:
+      labels:
+        app: healthcare-auth
+    spec:
+      containers:
+        - name: auth-service
+          image: healthcare/auth-service:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8081
+          env:
+            - name: SPRING_DATASOURCE_URL
+              value: jdbc:mysql://mysql:3306/healthcare_db?createDatabaseIfNotExist=true
+            - name: SPRING_DATASOURCE_USERNAME
+              value: healthcare
+            - name: SPRING_DATASOURCE_PASSWORD
+              value: "123456"
+            - name: SERVER_PORT
+              value: "8081"
+            - name: SPRING_MAIL_HOST
+              value: smtp.gmail.com
+            - name: SPRING_MAIL_PORT
+              value: "587"
+            - name: SPRING_MAIL_USERNAME
+              value: dilanavishka183@gmail.com
+            - name: SPRING_MAIL_PASSWORD
+              value: pllb iekj knmu scuc
+            - name: SPRING_MAIL_PROPERTIES_MAIL_SMTP_AUTH
+              value: "true"
+            - name: SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE
+              value: "true"
+            - name: APP_JWT_SECRET
+              value: my-super-secret-key-change-this-in-production
+            - name: APP_JWT_EXPIRATION_HOURS
+              value: "8"

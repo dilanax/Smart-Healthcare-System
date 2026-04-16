@@ -1,0 +1,45 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: patient-service
+  labels:
+    app: healthcare-patient
+spec:
+  ports:
+    - port: 8083
+      targetPort: 8083
+  selector:
+    app: healthcare-patient
+  type: ClusterIP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: patient-service
+  labels:
+    app: healthcare-patient
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: healthcare-patient
+  template:
+    metadata:
+      labels:
+        app: healthcare-patient
+    spec:
+      containers:
+        - name: patient-service
+          image: healthcare/patient-service:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8083
+          env:
+            - name: SPRING_DATASOURCE_URL
+              value: jdbc:mysql://mysql:3306/healthcare_db?createDatabaseIfNotExist=true
+            - name: SPRING_DATASOURCE_USERNAME
+              value: healthcare
+            - name: SPRING_DATASOURCE_PASSWORD
+              value: "123456"
+            - name: SERVER_PORT
+              value: "8083"
