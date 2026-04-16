@@ -15,6 +15,5 @@ public interface AuthService {
     ApiResponseDto updateUser(Long userId, UpdateUserRequestDto requestDto);
     ApiResponseDto deleteUser(Long userId);
     boolean isUserOrAdminTokenValid(String token, Long targetUserId);
-    boolean isAdminTokenValid(String bearerToken);
-
+    boolean isAdminTokenValid(String token);
 }
