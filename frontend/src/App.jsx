@@ -8,6 +8,8 @@ import RegisterPage from './pages/register-page';
 import AppointmentPage from './pages/appointment-page';
 import PaymentPage from "./pages/payment-page";
 import ProfilePage from './pages/profile-page';
+import SymptomChecker from './pages/SymptomChecker';
+import SymptomChatBot from './pages/SymptomChatBot';
 import { getStoredUser } from './lib/auth';
 import './App.css';
 
@@ -21,6 +23,8 @@ const routes = {
   '/appointment': AppointmentPage,
   '/payment': PaymentPage,
   '/profile': ProfilePage,
+  '/symptom-checker': SymptomChecker,
+  '/symptom-chatbot': SymptomChatBot,
 };
 
 const getCurrentPath = () => {

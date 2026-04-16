@@ -76,7 +76,6 @@ const Navbar = ({ navigate, currentUser }) => {
       }
       setActiveLink(sectionId);
     }
-
     setIsMenuOpen(false);
   };
 

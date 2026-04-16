@@ -1,0 +1,9 @@
+version: '3.8'
+services:
+  ai-symptom-service:
+    build:
+      context: ./backend/ai-symptom-service
+      dockerfile: Dockerfile
+    ports:
+      - "8087:8087"
+    restart: unless-stopped
