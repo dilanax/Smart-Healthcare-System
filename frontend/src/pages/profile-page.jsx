@@ -10,9 +10,8 @@ const buildJitsiCallUrl = (roomName, displayName) =>
   `https://meet.jit.si/${encodeURIComponent(roomName)}#userInfo.displayName=${encodeURIComponent(displayName)}&config.startWithVideoMuted=false&config.startWithAudioMuted=false&config.prejoinPageEnabled=false`;
 
 const getMediaPermissionError = (error) => {
-  if (error?.name === 'NotAllowedError') return 'Camera/Microphone permission denied. Click the lock icon near URL and allow camera + microphone.';
-  if (error?.name === 'NotFoundError') return 'No camera device found on this computer.';
-  if (error?.name === 'NotReadableError') return 'Camera is busy in another app. Close other apps and try again.';
+  if (error?.name === 'NotAllowedError') return 'Camera/Microphone permission denied.';
+  if (error?.name === 'NotFoundError') return 'No camera device found.';
   return 'Unable to access camera/microphone on this browser.';
 };
 
@@ -23,17 +22,15 @@ const ProfilePage = ({ navigate, currentUser }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   
-  // Telemedicine State
   const [activeCall, setActiveCall] = useState(null);
   const [mediaReady, setMediaReady] = useState(false);
 
-  // Avatar State & Refs
   const avatarUploadRef = useRef(null);
   const [profilePicUrl, setProfilePicUrl] = useState('');
 
-  // Tabs & Edit State
   const [activeTab, setActiveTab] = useState('appointments'); 
   const [isEditing, setIsEditing] = useState(false);
+  
   const [editForm, setEditForm] = useState({
     firstName: '', lastName: '', phoneNumber: '', age: '', gender: ''
   });
@@ -54,6 +51,19 @@ const ProfilePage = ({ navigate, currentUser }) => {
     fetchData();
   }, [currentUser, navigate]);
 
+  // Forces React to fill the edit form boxes when data loads
+  useEffect(() => {
+    if (userDetails) {
+      setEditForm({
+        firstName: userDetails.firstName || '',
+        lastName: userDetails.lastName || '',
+        phoneNumber: userDetails.phoneNumber || '',
+        age: userDetails.age || '',
+        gender: userDetails.gender || ''
+      });
+    }
+  }, [userDetails]);
+
   const fetchData = async () => {
     try {
       setLoading(true);
@@ -61,7 +71,6 @@ const ProfilePage = ({ navigate, currentUser }) => {
       const token = getCleanToken();
       const actualUserId = currentUser?.userId;
 
-      // 1. Fetch Secure Profile Picture
       try {
           const picRes = await fetch(`http://localhost:8083/api/patients/profile/${actualUserId}/picture`, {
               method: 'GET',
@@ -73,19 +82,16 @@ const ProfilePage = ({ navigate, currentUser }) => {
           }
       } catch (e) { console.warn("Could not fetch profile picture."); }
 
-      // 2. Fetch User Details (Port 8081)
       try {
         const userResponse = await fetch(`http://localhost:8081/api/auth/user/${actualUserId}`, {
           headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
         });
         if (userResponse.ok) {
           const userData = await userResponse.json();
-          const user = userData.data || userData;
-          setUserDetails(user);
+          setUserDetails(userData.data || userData);
         }
       } catch (e) { console.warn("Auth Service offline."); }
 
-      // 3. Fetch Appointments (Port 8085)
       try {
         const apptRes = await fetch(`http://localhost:8085/api/appointments?patientId=${actualUserId}`);
         if (apptRes.ok) {
@@ -94,7 +100,6 @@ const ProfilePage = ({ navigate, currentUser }) => {
         }
       } catch (e) { console.warn("Appointment Service offline."); }
 
-      // 4. Fetch Local Prescriptions
       try {
         const allPrescriptions = JSON.parse(localStorage.getItem(STORAGE_KEY_PRESCRIPTIONS) || '[]');
         const mine = Array.isArray(allPrescriptions)
@@ -104,13 +109,12 @@ const ProfilePage = ({ navigate, currentUser }) => {
       } catch { setPrescriptions([]); }
 
     } catch (err) {
-      setError('Some data could not be loaded, but your profile is still available.');
+      setError('Some data could not be loaded.');
     } finally {
       setLoading(false);
     }
   };
 
-  // --- Avatar Upload Logic ---
   const handleAvatarClick = () => {
     if (avatarUploadRef.current) avatarUploadRef.current.click();
   };
@@ -120,7 +124,6 @@ const ProfilePage = ({ navigate, currentUser }) => {
     if (!file) return;
 
     setProfilePicUrl(URL.createObjectURL(file));
-
     const token = getCleanToken();
     const actualUserId = currentUser?.userId;
     const toastId = toast.loading("Saving picture...");
@@ -135,22 +138,18 @@ const ProfilePage = ({ navigate, currentUser }) => {
         body: formData
       });
 
-      if (res.ok) {
-        toast.success("Profile picture updated!", { id: toastId });
-      } else {
-        toast.error("Failed to save to database.", { id: toastId });
-      }
+      if (res.ok) toast.success("Profile picture updated!", { id: toastId });
+      else toast.error("Failed to save.", { id: toastId });
     } catch (err) {
-      toast.error("Network error during upload.", { id: toastId });
+      toast.error("Network error.", { id: toastId });
     }
   };
 
-  // --- Profile Edit Logic ---
   const handleUpdateProfile = async (e) => {
     e.preventDefault();
     const token = getCleanToken();
     const actualUserId = currentUser?.userId;
-    const toastId = toast.loading("Saving personal details...");
+    const toastId = toast.loading("Saving details...");
 
     const cleanPayload = {
       ...editForm,
@@ -164,20 +163,18 @@ const ProfilePage = ({ navigate, currentUser }) => {
         body: JSON.stringify(cleanPayload)
       });
 
-      const resData = await res.json();
       if (res.ok) {
-        toast.success("Profile updated successfully!", { id: toastId });
-        setIsEditing(false); // Close the form
-        fetchData(); // Refresh data to show new details
+        toast.success("Profile updated!", { id: toastId });
+        setIsEditing(false); 
+        fetchData(); 
       } else {
-        toast.error(resData.message || "Failed to update profile.", { id: toastId });
+        toast.error("Failed to update profile.", { id: toastId });
       }
     } catch (err) {
       toast.error("Network error.", { id: toastId });
     }
   };
 
-  // --- Telemedicine Logic ---
   const checkMediaPermissions = async () => {
     if (!navigator.mediaDevices?.getUserMedia) {
       setMediaReady(false);
@@ -204,6 +201,26 @@ const ProfilePage = ({ navigate, currentUser }) => {
     setActiveCall({ appointment, roomName: `healthcare-appt-${appointmentId}` });
   };
 
+  const generateActivityHistory = () => {
+    let history = [];
+    if (userDetails?.createdAt) {
+      history.push({ id: 'acc-create', type: 'Account', title: 'Joined HealthCare+', date: new Date(userDetails.createdAt), icon: '🎉', color: 'bg-blue-100 text-blue-600' });
+    } else {
+      history.push({ id: 'acc-create', type: 'Account', title: 'Account Activated', date: new Date(Date.now() - 864000000), icon: '✅', color: 'bg-blue-100 text-blue-600' });
+    }
+    appointments.forEach((appt) => {
+      history.push({
+        id: `appt-${appt.id}`, type: 'Appointment', title: `Consultation with Dr. ${appt.doctorLastName}`, date: new Date(appt.appointmentDate), icon: '📅', color: 'bg-teal-100 text-teal-600'
+      });
+    });
+    prescriptions.forEach((rx) => {
+      history.push({
+        id: `rx-${rx.id}`, type: 'Prescription', title: `Received Prescription for ${rx.diagnosis || 'Treatment'}`, date: new Date(rx.issuedAt), icon: '💊', color: 'bg-purple-100 text-purple-600'
+      });
+    });
+    return history.sort((a, b) => b.date - a.date);
+  };
+
   if (loading) return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
       <Navbar navigate={navigate} currentUser={currentUser} />
@@ -218,16 +235,9 @@ const ProfilePage = ({ navigate, currentUser }) => {
       <Toaster position="top-right" />
       <Navbar navigate={navigate} currentUser={currentUser} />
 
-      {/* Teal Banner Background */}
       <div className="h-64 bg-gradient-to-r from-teal-600 to-cyan-600 w-full absolute top-0 left-0 z-0" />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 pt-28">
-        {error && (
-          <div className="mb-6 bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded shadow-sm">
-            {error}
-          </div>
-        )}
-
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
           
           {/* ================= LEFT COLUMN: PROFILE CARD ================= */}
@@ -238,41 +248,22 @@ const ProfilePage = ({ navigate, currentUser }) => {
                 <div className="w-40 h-40 rounded-full border-4 border-white shadow-xl bg-slate-100 overflow-hidden mx-auto">
                   <img 
                     src={profilePicUrl || `https://ui-avatars.com/api/?name=${userDetails?.firstName || 'User'}&background=14b8a6&color=fff&size=200`} 
-                    className="w-full h-full object-cover" 
-                    alt="Profile" 
-                    onError={(e) => { e.target.src = `https://ui-avatars.com/api/?name=${userDetails?.firstName || 'User'}&background=14b8a6&color=fff&size=200`; }}
+                    className="w-full h-full object-cover" alt="Profile" 
                   />
                 </div>
-                
-                <button 
-                  onClick={handleAvatarClick}
-                  className="absolute bottom-1 right-1 w-11 h-11 bg-teal-500 hover:bg-teal-600 text-white rounded-full border-4 border-white shadow-lg flex items-center justify-center transition-transform hover:scale-110 z-50 cursor-pointer"
-                  title="Change Photo"
-                >
-                  <svg className="w-4 h-4 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                  </svg>
+                <button onClick={handleAvatarClick} className="absolute bottom-1 right-1 w-11 h-11 bg-teal-500 hover:bg-teal-600 text-white rounded-full border-4 border-white shadow-lg flex items-center justify-center transition-transform hover:scale-110 z-50">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
                 </button>
               </div>
-
-              <input 
-                type="file" 
-                accept="image/*" 
-                ref={avatarUploadRef}
-                onChange={handleProfilePicUpload} 
-                className="hidden" 
-              />
+              <input type="file" accept="image/*" ref={avatarUploadRef} onChange={handleProfilePicUpload} className="hidden" />
 
               <h1 className="text-2xl font-black text-slate-800 tracking-tight">
                 {userDetails?.firstName || currentUser?.name || 'Patient'} {userDetails?.lastName || ''}
               </h1>
-              <span className="inline-block px-3 py-1 bg-teal-50 text-teal-700 text-xs font-bold rounded-full mt-2 mb-4">
-                ID: #{currentUser?.userId}
-              </span>
+              <span className="inline-block px-3 py-1 bg-teal-50 text-teal-700 text-xs font-bold rounded-full mt-2 mb-4">ID: #{currentUser?.userId}</span>
 
               <div className="w-full h-px bg-slate-100 my-6"></div>
 
-              {/* User Meta Data */}
               <div className="space-y-4 text-left">
                 <div className="flex items-center gap-4">
                   <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-500 flex items-center justify-center text-lg">📧</div>
@@ -297,40 +288,25 @@ const ProfilePage = ({ navigate, currentUser }) => {
                 </div>
               </div>
 
-              {/* 🚨 THE FIX: This accurately copies your details into the form immediately on click! */}
               <button 
-                onClick={() => {
-                  if (!isEditing) {
-                    setEditForm({
-                      firstName: userDetails?.firstName || '',
-                      lastName: userDetails?.lastName || '',
-                      phoneNumber: userDetails?.phoneNumber || '',
-                      age: userDetails?.age || '',
-                      gender: userDetails?.gender || ''
-                    });
-                  }
-                  setIsEditing(!isEditing);
-                }}
+                onClick={() => setIsEditing(!isEditing)}
                 className={`mt-8 w-full py-3 rounded-xl font-bold transition-all ${isEditing ? 'bg-slate-200 text-slate-700 hover:bg-slate-300' : 'bg-slate-900 text-white shadow-lg hover:bg-slate-800'}`}
               >
                 {isEditing ? 'Cancel Editing' : '✏️ Edit Profile Details'}
               </button>
-
             </div>
           </div>
 
           {/* ================= RIGHT COLUMN: DASHBOARD ================= */}
           <div className="lg:col-span-8 flex flex-col gap-6">
-            
             <AnimatePresence mode="wait">
               {isEditing ? (
-                // --- EDIT PROFILE FORM ---
+                // --- EDIT FORM ---
                 <motion.div key="edit" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="bg-white rounded-3xl p-8 shadow-sm border border-slate-100">
                   <h2 className="text-2xl font-black text-slate-800 mb-6 flex items-center gap-3">
                     <span className="w-10 h-10 rounded-xl bg-teal-50 text-teal-600 flex items-center justify-center text-xl">📝</span>
                     Update Personal Details
                   </h2>
-                  
                   <form onSubmit={handleUpdateProfile} className="space-y-6">
                     <div className="grid md:grid-cols-2 gap-6">
                       <InputField label="First Name" value={editForm.firstName} onChange={v => setEditForm({...editForm, firstName: v})} />
@@ -352,34 +328,21 @@ const ProfilePage = ({ navigate, currentUser }) => {
                         </select>
                       </div>
                     </div>
-
                     <div className="pt-6 border-t border-slate-100 flex justify-end">
-                        <button type="submit" className="px-10 py-4 bg-teal-600 text-white rounded-xl font-black hover:bg-teal-700 transition-colors shadow-lg">
-                            Save Changes
-                        </button>
+                        <button type="submit" className="px-10 py-4 bg-teal-600 text-white rounded-xl font-black hover:bg-teal-700 transition-colors shadow-lg">Save Changes</button>
                     </div>
                   </form>
                 </motion.div>
-
               ) : (
-                // --- NORMAL TABS DASHBOARD ---
                 <motion.div key="tabs" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+                  {/* TABS MENU */}
                   <div className="bg-white rounded-2xl p-2 shadow-sm border border-slate-100 flex overflow-x-auto gap-2 mb-6">
-                      <button 
-                        onClick={() => setActiveTab('appointments')} 
-                        className={`flex-1 py-3 px-4 rounded-xl text-sm font-bold transition-all whitespace-nowrap ${activeTab === 'appointments' ? 'bg-teal-500 text-white shadow-md' : 'text-slate-500 hover:bg-slate-50'}`}
-                      >
-                        📅 Appointments
-                      </button>
-                      <button 
-                        onClick={() => setActiveTab('prescriptions')} 
-                        className={`flex-1 py-3 px-4 rounded-xl text-sm font-bold transition-all whitespace-nowrap ${activeTab === 'prescriptions' ? 'bg-teal-500 text-white shadow-md' : 'text-slate-500 hover:bg-slate-50'}`}
-                      >
-                        💊 Prescriptions
-                      </button>
+                      <button onClick={() => setActiveTab('appointments')} className={`flex-1 py-3 px-4 rounded-xl text-sm font-bold transition-all whitespace-nowrap ${activeTab === 'appointments' ? 'bg-teal-500 text-white shadow-md' : 'text-slate-500 hover:bg-slate-50'}`}>📅 Appointments</button>
+                      <button onClick={() => setActiveTab('prescriptions')} className={`flex-1 py-3 px-4 rounded-xl text-sm font-bold transition-all whitespace-nowrap ${activeTab === 'prescriptions' ? 'bg-teal-500 text-white shadow-md' : 'text-slate-500 hover:bg-slate-50'}`}>💊 Prescriptions</button>
+                      <button onClick={() => setActiveTab('history')} className={`flex-1 py-3 px-4 rounded-xl text-sm font-bold transition-all whitespace-nowrap ${activeTab === 'history' ? 'bg-teal-500 text-white shadow-md' : 'text-slate-500 hover:bg-slate-50'}`}>🕒 Activity History</button>
                   </div>
 
-                  {/* TAB: Appointments */}
+                  {/* 🚨 RESTORED: Beautiful Appointment Cards with Telemedicine 🚨 */}
                   {activeTab === 'appointments' && (
                     <div className="space-y-6">
                       {activeCall && (
@@ -414,8 +377,8 @@ const ProfilePage = ({ navigate, currentUser }) => {
                           </button>
                         </div>
                       ) : (
-                        appointments.map((appt) => (
-                          <div key={appt.id} className="bg-white rounded-3xl p-6 border border-slate-100 shadow-sm hover:shadow-md transition-shadow">
+                        appointments.map((appt, i) => (
+                          <div key={appt?.id || `appt-${i}`} className="bg-white rounded-3xl p-6 border border-slate-100 shadow-sm hover:shadow-md transition-shadow">
                             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-4 pb-4 border-b border-slate-50">
                               <div className="flex items-center gap-4">
                                 <div className="w-14 h-14 rounded-2xl bg-teal-50 text-teal-600 flex items-center justify-center text-2xl border border-teal-100">👨‍⚕️</div>
@@ -443,7 +406,7 @@ const ProfilePage = ({ navigate, currentUser }) => {
                     </div>
                   )}
 
-                  {/* TAB: Prescriptions */}
+                  {/* 🚨 RESTORED: Beautiful Prescription Cards 🚨 */}
                   {activeTab === 'prescriptions' && (
                     <div className="space-y-6">
                       {prescriptions.length === 0 ? (
@@ -453,8 +416,8 @@ const ProfilePage = ({ navigate, currentUser }) => {
                           <p className="text-slate-500">Your doctors haven't uploaded any prescriptions yet.</p>
                         </div>
                       ) : (
-                        prescriptions.map((rx) => (
-                          <div key={rx.id} className="bg-white rounded-3xl p-6 border border-slate-100 shadow-sm">
+                        prescriptions.map((rx, i) => (
+                          <div key={rx?.id || `rx-${i}`} className="bg-white rounded-3xl p-6 border border-slate-100 shadow-sm">
                             <div className="flex justify-between items-center mb-4">
                               <h4 className="font-black text-slate-800">Prescription #{rx.id}</h4>
                               <span className="text-xs font-bold text-slate-400">{new Date(rx.issuedAt).toLocaleDateString()}</span>
@@ -465,8 +428,8 @@ const ProfilePage = ({ navigate, currentUser }) => {
                             </div>
                             <h5 className="font-bold text-xs uppercase tracking-widest text-slate-400 mb-3">Medications</h5>
                             <ul className="space-y-2">
-                              {rx.medications?.map((m, i) => (
-                                <li key={i} className="flex items-center gap-3 text-sm text-slate-700">
+                              {rx.medications?.map((m, idx) => (
+                                <li key={`med-${idx}`} className="flex items-center gap-3 text-sm text-slate-700">
                                   <span className="w-2 h-2 rounded-full bg-teal-500"></span>
                                   <span className="font-bold">{m?.name}</span> - {m?.dosage}, {m?.frequency} ({m?.duration})
                                 </li>
@@ -477,10 +440,30 @@ const ProfilePage = ({ navigate, currentUser }) => {
                       )}
                     </div>
                   )}
+
+                  {/* HISTORY TAB CONTENT */}
+                  {activeTab === 'history' && (
+                    <div className="bg-white rounded-3xl p-8 border border-slate-100 shadow-sm">
+                      <h3 className="text-xl font-black text-slate-800 mb-8">Recent Activity</h3>
+                      <div className="relative border-l-2 border-slate-100 ml-4 space-y-8">
+                        {generateActivityHistory().map((activity) => (
+                          <div key={activity.id} className="relative pl-8">
+                            <div className={`absolute -left-5 top-0 w-10 h-10 rounded-full flex items-center justify-center text-lg border-4 border-white ${activity.color}`}>
+                              {activity.icon}
+                            </div>
+                            <div className="bg-slate-50 rounded-2xl p-4">
+                              <p className="text-xs font-black text-slate-400 mb-1">{activity.date.toLocaleDateString()} at {activity.date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</p>
+                              <h4 className="font-bold text-slate-800 text-sm">{activity.title}</h4>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
                 </motion.div>
               )}
             </AnimatePresence>
-            
           </div>
         </div>
       </div>
@@ -488,7 +471,6 @@ const ProfilePage = ({ navigate, currentUser }) => {
   );
 };
 
-// --- Helper Component ---
 const InputField = ({ label, type = "text", value, onChange }) => (
     <div className="space-y-2">
         <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-2">{label}</label>
