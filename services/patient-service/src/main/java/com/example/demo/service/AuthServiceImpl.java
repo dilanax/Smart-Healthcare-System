@@ -211,27 +211,45 @@ public class AuthServiceImpl implements AuthService, EmailService {
             return false;
         }
     }
-
-    // 🚨 THIS FIXES THE SECURITY BLOCK PREVENTING PATIENTS FROM UPDATING 🚨
+    // 🚨 PASTE THIS NEW METHOD JUST ABOVE sendOtpEmail() 🚨
     @Override
     public boolean isUserOrAdminTokenValid(String token, Long targetUserId) {
-        if (token == null || token.isBlank()) return false;
+        if (token == null || token.isBlank()) {
+            return false;
+        }
+
         try {
             String[] parts = token.split("\\.");
-            if (parts.length != 3) return false;
+            if (parts.length != 3) {
+                return false;
+            }
+
             String payloadJson = new String(Base64.getUrlDecoder().decode(parts[1]), StandardCharsets.UTF_8);
             Map<String, Object> claims = objectMapper.readValue(payloadJson, new TypeReference<Map<String, Object>>() {});
+
             String expectedSignature = sign(parts[0] + "." + parts[1]);
-            if (!MessageDigest.isEqual(expectedSignature.getBytes(StandardCharsets.UTF_8), parts[2].getBytes(StandardCharsets.UTF_8))) return false;
+            if (!MessageDigest.isEqual(expectedSignature.getBytes(StandardCharsets.UTF_8),
+                    parts[2].getBytes(StandardCharsets.UTF_8))) {
+                return false;
+            }
+
             Object exp = claims.get("exp");
             if (exp == null) return false;
             long expValue = ((Number) exp).longValue();
             long now = LocalDateTime.now().toEpochSecond(ZoneOffset.UTC);
             if (now >= expValue) return false;
+
             Object role = claims.get("role");
             Object tokenId = claims.get("id");
-            if ("ADMIN".equalsIgnoreCase(String.valueOf(role))) return true;
-            if (tokenId != null && Long.valueOf(String.valueOf(tokenId)).equals(targetUserId)) return true;
+
+            // Allow if Admin OR if the Token ID matches the Profile ID being edited
+            if ("ADMIN".equalsIgnoreCase(String.valueOf(role))) {
+                return true;
+            }
+            if (tokenId != null && Long.valueOf(String.valueOf(tokenId)).equals(targetUserId)) {
+                return true;
+            }
+
             return false;
         } catch (Exception e) {
             return false;
