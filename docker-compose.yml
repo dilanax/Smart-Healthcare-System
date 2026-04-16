@@ -150,7 +150,6 @@ services:
     networks:
       - healthcare-network
 
-  # Frontend
  # Frontend
   frontend:
     build:
@@ -169,7 +168,7 @@ services:
       - patient-service
       - notification-service
       - appointment-service
-      - payment-service
+      #- payment-service
     networks:
       - healthcare-network
 

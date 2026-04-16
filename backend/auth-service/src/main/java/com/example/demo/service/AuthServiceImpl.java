@@ -211,6 +211,15 @@ public class AuthServiceImpl implements AuthService, EmailService {
         if (requestDto.getPhoneNumber() != null) {
             user.setPhoneNumber(requestDto.getPhoneNumber());
         }
+        
+        // 🚨 FIX: We now tell Java to save Age and Gender to the database!
+        if (requestDto.getAge() != null) {
+            user.setAge(requestDto.getAge());
+        }
+        if (requestDto.getGender() != null) {
+            user.setGender(requestDto.getGender());
+        }
+
         if (requestDto.getRole() != null) {
             user.setRole(requestDto.getRole());
         }
@@ -297,7 +306,7 @@ public class AuthServiceImpl implements AuthService, EmailService {
         return String.valueOf(otpNumber);
     }
 
-    private String generateAdminToken(User user) {
+    private String generateJwtToken(User user) {
         try {
             long issuedAt = LocalDateTime.now().toEpochSecond(ZoneOffset.UTC);
             long expiresAt = LocalDateTime.now().plusHours(jwtExpirationHours).toEpochSecond(ZoneOffset.UTC);
@@ -339,10 +348,11 @@ public class AuthServiceImpl implements AuthService, EmailService {
         data.put("email", user.getEmail());
         data.put("role", user.getRole());
         data.put("name", user.getFirstName() + " " + user.getLastName());
-        if (user.getRole() == Role.ADMIN) {
-            data.put("accessToken", generateAdminToken(user));
-            data.put("tokenType", "Bearer");
-        }
+        
+        // 🚨 FIX: Now EVERY user gets an ID card (token) to access their own profile!
+        data.put("accessToken", generateJwtToken(user));
+        data.put("tokenType", "Bearer");
+        
         return data;
     }
 
@@ -353,11 +363,70 @@ public class AuthServiceImpl implements AuthService, EmailService {
         data.put("lastName", user.getLastName());
         data.put("email", user.getEmail());
         data.put("phoneNumber", user.getPhoneNumber());
+        
+        // 🚨 FIX: We now tell Java to send Age and Gender back to React!
+        data.put("age", user.getAge());
+        data.put("gender", user.getGender());
+        
         data.put("role", user.getRole());
         data.put("active", user.isActive());
         data.put("otpVerified", user.isOtpVerified());
         data.put("createdAt", user.getCreatedAt());
         data.put("updatedAt", user.getUpdatedAt());
         return data;
+    }
+
+    @Override
+    public boolean isUserOrAdminTokenValid(String token, Long targetUserId) {
+        System.out.println("\n=== 🚨 SECURITY DEBUG CHECK 🚨 ===");
+        System.out.println("1. Token Received: " + token);
+        System.out.println("2. Target User ID: " + targetUserId);
+        
+        if (token == null || token.isBlank() || token.equals("null")) {
+            System.out.println("❌ FAILED: Token is missing or says 'null'");
+            return false;
+        }
+
+        try {
+            String[] parts = token.split("\\.");
+            if (parts.length != 3) {
+                System.out.println("❌ FAILED: Token is malformed (not 3 parts)");
+                return false;
+            }
+
+            String payloadJson = new String(Base64.getUrlDecoder().decode(parts[1]), StandardCharsets.UTF_8);
+            System.out.println("3. Token Payload: " + payloadJson);
+            
+            Map<String, Object> claims = objectMapper.readValue(payloadJson, new TypeReference<Map<String, Object>>() {});
+
+            String expectedSignature = sign(parts[0] + "." + parts[1]);
+            if (!MessageDigest.isEqual(expectedSignature.getBytes(StandardCharsets.UTF_8), parts[2].getBytes(StandardCharsets.UTF_8))) {
+                System.out.println("❌ FAILED: Signature mismatch (You are using an old/broken token!)");
+                return false;
+            }
+
+            Object role = claims.get("role");
+            Object tokenId = claims.get("id");
+            System.out.println("4. Found Role in Token: " + role);
+            System.out.println("5. Found ID in Token: " + tokenId);
+
+            if ("ADMIN".equalsIgnoreCase(String.valueOf(role))) {
+                System.out.println("✅ SUCCESS: Admin Bypass Granted");
+                return true;
+            }
+
+            if (tokenId != null && Long.valueOf(String.valueOf(tokenId)).equals(targetUserId)) {
+                System.out.println("✅ SUCCESS: Profile ID matches Token ID!");
+                return true;
+            }
+
+            System.out.println("❌ FAILED: Token ID does not match Target ID");
+            return false;
+
+        } catch (Exception e) {
+            System.out.println("❌ FAILED: Java Exception Thrown!");
+            e.printStackTrace();
+            return false;
+        }
     }
 }

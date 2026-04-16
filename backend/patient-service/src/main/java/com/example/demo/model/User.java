@@ -29,6 +29,10 @@ public class User {
 
     private String phoneNumber;
 
+    private Integer age;
+
+    private String gender;
+
     @Enumerated(EnumType.STRING)
     private Role role;
 
@@ -54,4 +58,10 @@ public class User {
     public void preUpdate() {
         updatedAt = LocalDateTime.now();
     }
+
+    public Integer getAge() { return age; }
+    public void setAge(Integer age) { this.age = age; }
+
+    public String getGender() { return gender; }
+    public void setGender(String gender) { this.gender = gender; }
 }
