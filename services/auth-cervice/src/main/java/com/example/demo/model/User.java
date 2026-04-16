@@ -36,14 +36,12 @@ public class User {
     @Enumerated(EnumType.STRING)
     private Role role;
 
-    @Builder.Default
     private boolean isActive = true;
 
     private String otp;
 
     private LocalDateTime otpExpiry;
 
-    @Builder.Default
     private boolean otpVerified = false;
 
     private LocalDateTime createdAt;
@@ -60,4 +58,10 @@ public class User {
     public void preUpdate() {
         updatedAt = LocalDateTime.now();
     }
+
+    public Integer getAge() { return age; }
+    public void setAge(Integer age) { this.age = age; }
+
+    public String getGender() { return gender; }
+    public void setGender(String gender) { this.gender = gender; }
 }
