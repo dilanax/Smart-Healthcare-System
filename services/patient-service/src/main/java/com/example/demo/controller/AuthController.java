@@ -54,7 +54,7 @@ public class AuthController {
 @GetMapping("/user/{userId}")
     public ApiResponseDto getUserById(@RequestHeader(value = "Authorization", required = false) String authorizationHeader,
                                       @PathVariable Long userId) {
-        // 🚨 CHANGED: Allow users to view their own profile
+        // 🚨 CHANGED: Allow patients to view their own profile
         if (!authService.isUserOrAdminTokenValid(extractBearerToken(authorizationHeader), userId)) {
             return new ApiResponseDto("Unauthorized: You can only view your own profile", null);
         }
@@ -65,7 +65,7 @@ public class AuthController {
     public ApiResponseDto updateUser(@RequestHeader(value = "Authorization", required = false) String authorizationHeader,
                                      @PathVariable Long userId,
                                      @RequestBody UpdateUserRequestDto requestDto) {
-        // 🚨 CHANGED: Allow users to edit their own profile
+        // 🚨 CHANGED: Allow patients to edit their own profile
         if (!authService.isUserOrAdminTokenValid(extractBearerToken(authorizationHeader), userId)) {
             return new ApiResponseDto("Unauthorized: You can only update your own profile", null);
         }
