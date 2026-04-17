@@ -893,7 +893,17 @@ const approvePayment = async (paymentId) => {
       setBusyId(null);
     }
   };
+const handleLogout = () => {
+  const confirmed = window.confirm('Are you sure you want to logout?');
+  if (!confirmed) return;
 
+  localStorage.removeItem('token');
+  localStorage.removeItem('user');
+  sessionStorage.clear();
+
+  refreshUser?.();
+  navigate('/login');
+};
   if (!currentUser || currentUser.role !== 'ADMIN' || !accessToken) return null;
 
   return (
@@ -922,12 +932,29 @@ const approvePayment = async (paymentId) => {
               <p className="mt-1 text-sm text-gray-500">Connected to the Spring Boot backend user API</p>
             </div>
             <div className="flex items-center gap-4">
-              <button type="button" onClick={() => loadUsers()} className="rounded-xl border border-teal-200 px-4 py-2 text-sm font-semibold text-teal-700 hover:bg-teal-50">Refresh</button>
-              <div className="text-right">
-                <p className="text-sm font-semibold text-gray-800">{currentUser.name || currentUser.email}</p>
-                <p className="text-xs text-gray-500">Administrator</p>
-              </div>
-            </div>
+  <button
+    type="button"
+    onClick={() => loadUsers()}
+    className="rounded-xl border border-teal-200 px-4 py-2 text-sm font-semibold text-teal-700 hover:bg-teal-50"
+  >
+    Refresh
+  </button>
+
+  <button
+    type="button"
+    onClick={handleLogout}
+    className="rounded-xl bg-red-500 px-4 py-2 text-sm font-semibold text-white hover:bg-red-600"
+  >
+    Logout
+  </button>
+
+  <div className="text-right">
+    <p className="text-sm font-semibold text-gray-800">
+      {currentUser.name || currentUser.email}
+    </p>
+    <p className="text-xs text-gray-500">Administrator</p>
+  </div>
+</div>
           </header>
 
           <main className="p-8">
