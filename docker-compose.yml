@@ -23,7 +23,7 @@ services:
   # Auth Service
   auth-service:
     build:
-      context: ./services/auth-cervice
+      context: ./backend/auth-service
       dockerfile: Dockerfile
     container_name: auth-service
     environment:
@@ -50,7 +50,7 @@ services:
   # Doctor Service
   doctor-service:
     build:
-      context: ./services/doctor-service
+      context: ./backend/doctor-service
       dockerfile: Dockerfile
     container_name: doctor-service
     environment:
@@ -69,7 +69,7 @@ services:
   # Patient Service
   patient-service:
     build:
-      context: ./services/patient-service
+      context: ./backend/patient-service
       dockerfile: Dockerfile
     container_name: patient-service
     environment:
@@ -88,7 +88,7 @@ services:
   # Notification Service
   notification-service:
     build:
-      context: ./services/notification-service
+      context: ./backend/notification-service
       dockerfile: Dockerfile
     container_name: notification-service
     environment:
@@ -113,7 +113,7 @@ services:
   # Appointment Service
   appointment-service:
     build:
-      context: ./services/appointment-service
+      context: ./backend/appointment-service
       dockerfile: Dockerfile
     container_name: appointment-service
     environment:
@@ -132,7 +132,7 @@ services:
   # Payment Service
   payment-service:
     build:
-      context: ./services/payment-service
+      context: ./backend/payment-service
       dockerfile: Dockerfile
     container_name: payment-service
     environment:
