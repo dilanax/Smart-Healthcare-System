@@ -407,6 +407,8 @@ const DoctorDashboard = ({ navigate, currentUser, refreshUser }) => {
     setActiveRoom({ roomName, appt });
   };
 
+  
+
   const endCall = () => setActiveRoom(null);
 
   const openCallInNewTab = (roomName) => {
