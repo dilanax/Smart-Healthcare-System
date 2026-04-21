@@ -8,6 +8,7 @@ import RegisterPage from './pages/register-page';
 import AppointmentPage from './pages/appointment-page';
 import PaymentPage from "./pages/payment-page";
 import ProfilePage from './pages/profile-page';
+import HealthAssistant from './components/health-assistant';
 import { getStoredUser } from './lib/auth';
 import './App.css';
 
@@ -61,6 +62,7 @@ function App() {
   return (
     <div className="min-h-screen bg-slate-50">
       <Page navigate={navigate} currentUser={currentUser} refreshUser={refreshUser} />
+      <HealthAssistant navigate={navigate} currentUser={currentUser} currentPath={currentPath} />
     </div>
   );
 }
