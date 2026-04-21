@@ -1,6 +1,7 @@
 package com.example.demo.service;
 
 import com.example.demo.dto.AppointmentNotificationEventRequest;
+import com.example.demo.dto.NotificationReadStatusUpdateRequest;
 import com.example.demo.dto.NotificationRequest;
 import com.example.demo.dto.NotificationReplyRequest;
 import com.example.demo.dto.NotificationStatusUpdateRequest;
@@ -20,6 +21,8 @@ public interface NotificationService {
     Notification updateNotification(Long notificationId, NotificationRequest request);
 
     Notification updateStatus(Long notificationId, NotificationStatusUpdateRequest request);
+
+    Notification updateReadStatus(Long notificationId, NotificationReadStatusUpdateRequest request);
 
     Notification replyToNotification(Long notificationId, NotificationReplyRequest request);
 

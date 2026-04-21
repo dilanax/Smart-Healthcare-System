@@ -2,6 +2,7 @@ package com.example.demo.service;
 
 import com.example.demo.dto.AppointmentNotificationEventRequest;
 import com.example.demo.dto.NotificationPartyContact;
+import com.example.demo.dto.NotificationReadStatusUpdateRequest;
 import com.example.demo.dto.NotificationRequest;
 import com.example.demo.dto.NotificationReplyRequest;
 import com.example.demo.dto.NotificationStatusUpdateRequest;
@@ -92,6 +93,15 @@ public class NotificationServiceImpl implements NotificationService {
     }
 
     @Override
+    public Notification updateReadStatus(Long notificationId, NotificationReadStatusUpdateRequest request) {
+        Notification notification = getNotificationById(notificationId);
+        boolean isRead = Boolean.TRUE.equals(request.getRead());
+        notification.setRead(isRead);
+        notification.setReadAt(isRead ? LocalDateTime.now() : null);
+        return notificationRepository.save(notification);
+    }
+
+    @Override
     public Notification replyToNotification(Long notificationId, NotificationReplyRequest request) {
         Notification notification = getNotificationById(notificationId);
         notification.setReplyMessage(request.getReplyMessage().trim());
@@ -153,6 +163,10 @@ public class NotificationServiceImpl implements NotificationService {
         notification.setStatus(request.getStatus() == null ? NotificationStatus.QUEUED : request.getStatus());
         notification.setScheduledAt(request.getScheduledAt());
         notification.setSentAt(request.getStatus() == NotificationStatus.SENT ? LocalDateTime.now() : null);
+        notification.setRead(Boolean.TRUE.equals(notification.getRead()));
+        if (!Boolean.TRUE.equals(notification.getRead())) {
+            notification.setReadAt(null);
+        }
     }
 
     private Notification createAndDispatchForContact(AppointmentNotificationEventRequest request,
@@ -173,6 +187,7 @@ public class NotificationServiceImpl implements NotificationService {
                 .channel(channel)
                 .priority(NotificationPriority.HIGH)
                 .status(NotificationStatus.QUEUED)
+                .read(false)
                 .scheduledAt(request.getEventTime())
                 .build();
 

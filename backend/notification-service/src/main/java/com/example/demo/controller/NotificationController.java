@@ -2,6 +2,7 @@ package com.example.demo.controller;
 
 import com.example.demo.dto.AppointmentNotificationEventRequest;
 import com.example.demo.dto.ApiResponse;
+import com.example.demo.dto.NotificationReadStatusUpdateRequest;
 import com.example.demo.dto.NotificationRequest;
 import com.example.demo.dto.NotificationReplyRequest;
 import com.example.demo.dto.NotificationStatusUpdateRequest;
@@ -61,6 +62,12 @@ public class NotificationController {
     public ApiResponse<Notification> updateStatus(@PathVariable Long notificationId,
                                                   @Valid @RequestBody NotificationStatusUpdateRequest request) {
         return ApiResponse.success("Notification status updated successfully.", notificationService.updateStatus(notificationId, request));
+    }
+
+    @PatchMapping("/{notificationId}/read-status")
+    public ApiResponse<Notification> updateReadStatus(@PathVariable Long notificationId,
+                                                      @Valid @RequestBody NotificationReadStatusUpdateRequest request) {
+        return ApiResponse.success("Notification read status updated successfully.", notificationService.updateReadStatus(notificationId, request));
     }
 
     @PatchMapping("/{notificationId}/reply")

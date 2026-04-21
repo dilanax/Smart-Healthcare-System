@@ -49,10 +49,12 @@ public class Notification {
     private LocalDateTime scheduledAt;
     private LocalDateTime sentAt;
     private LocalDateTime repliedAt;
+    private LocalDateTime readAt;
 
     private String replyMessage;
     private String repliedByName;
     private String repliedByEmail;
+    private Boolean read;
 
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
@@ -70,6 +72,9 @@ public class Notification {
         }
         if (this.channel == null) {
             this.channel = NotificationChannel.EMAIL;
+        }
+        if (this.read == null) {
+            this.read = false;
         }
     }
 
