@@ -40,6 +40,14 @@ public class DoctorController {
      */
     @PostMapping
     public ResponseEntity<Doctor> createDoctor(@RequestBody Doctor doctor) {
+        if (doctor.getUserId() == null) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        if (doctorRepository.existsById(doctor.getUserId())) {
+            return ResponseEntity.status(409).build();
+        }
+
         Doctor savedDoctor = doctorRepository.save(doctor);
         return ResponseEntity.ok(savedDoctor);
     }

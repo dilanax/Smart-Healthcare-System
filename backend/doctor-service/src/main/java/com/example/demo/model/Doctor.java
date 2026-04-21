@@ -1,14 +1,15 @@
 package com.example.demo.model;
 
 import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.PostLoad;
+import jakarta.persistence.PostPersist;
+import jakarta.persistence.Transient;
+import org.springframework.data.domain.Persistable;
 
 @Entity(name = "doctors")
-public class Doctor {
+public class Doctor implements Persistable<Integer> {
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer userId;
     private String firstName;
     private String lastName;
@@ -23,6 +24,8 @@ public class Doctor {
     private Double rating;
     private Integer experienceYears;
     private Integer patientCount;
+    @Transient
+    private boolean isNew = true;
 
     public Doctor() {}
 
@@ -46,6 +49,11 @@ public class Doctor {
     }
 
     // Getters and Setters
+    @Override
+    public Integer getId() {
+        return userId;
+    }
+
     public Integer getUserId() {
         return userId;
     }
@@ -156,5 +164,16 @@ public class Doctor {
 
     public void setPatientCount(Integer patientCount) {
         this.patientCount = patientCount;
+    }
+
+    @Override
+    public boolean isNew() {
+        return isNew;
+    }
+
+    @PostLoad
+    @PostPersist
+    void markNotNew() {
+        this.isNew = false;
     }
 }

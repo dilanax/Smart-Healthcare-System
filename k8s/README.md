@@ -28,16 +28,16 @@ kubectl get nodes
 Run from repo root:
 
 ```powershell
-docker build -t smart-healthcare/auth-service:latest ./services/auth-cervice
-docker build -t smart-healthcare/doctor-service:latest ./services/doctor-service
-docker build -t smart-healthcare/patient-service:latest ./services/patient-service
-docker build -t smart-healthcare/notification-service:latest ./services/notification-service
-docker build -t smart-healthcare/appointment-service:latest ./services/appointment-service
-docker build -t smart-healthcare/payment-service:latest ./services/payment-service
-docker build -t smart-healthcare/frontend:latest -f Dockerfile.frontend .
+docker build --no-cache -t smart-healthcare/auth-service:latest ./backend/auth-service
+docker build --no-cache -t smart-healthcare/doctor-service:latest ./backend/doctor-service
+docker build --no-cache -t smart-healthcare/patient-service:latest ./backend/patient-service
+docker build --no-cache -t smart-healthcare/notification-service:latest ./backend/notification-service
+docker build --no-cache -t smart-healthcare/appointment-service:latest ./backend/appointment-service
+docker build --no-cache -t smart-healthcare/payment-service:latest ./backend/payment-service
+docker build --no-cache -t smart-healthcare/frontend:latest ./frontend
 ```
 
-If you use Minikube, also load images:
+If you use Minikube, also load images into the cluster after building them locally:
 
 ```powershell
 minikube image load smart-healthcare/auth-service:latest
@@ -49,6 +49,8 @@ minikube image load smart-healthcare/payment-service:latest
 minikube image load smart-healthcare/frontend:latest
 ```
 
+If you use Docker Desktop Kubernetes, you usually do not need `minikube image load` because Kubernetes can use your local Docker images directly.
+
 ## 3) Apply Kubernetes Manifests
 
 ```powershell
@@ -58,6 +60,8 @@ kubectl apply -f k8s/mysql.yaml
 kubectl apply -f k8s/services.yaml
 kubectl apply -f k8s/frontend.yaml
 ```
+
+`k8s/services.yaml` already contains both the backend `Deployment` and `Service` resources. `k8s/frontend.yaml` contains the frontend `Deployment` and `Service`.
 
 ## 4) Verify Pods and Services
 
@@ -69,6 +73,8 @@ kubectl get svc -n smart-healthcare
 Wait until all pods are `Running`.
 
 ## 5) Access the App
+
+The Kubernetes services are `ClusterIP`, so they are not reachable from your browser until you expose them locally.
 
 Your frontend code currently calls APIs on `http://localhost:8081..8086`, so the easiest approach is port-forwarding:
 

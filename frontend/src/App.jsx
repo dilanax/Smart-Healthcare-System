@@ -42,9 +42,21 @@ function App() {
       setCurrentPath(getCurrentPath());
       setCurrentUser(getStoredUser());
     };
+    const syncCurrentUser = () => {
+      setCurrentUser(getStoredUser());
+    };
 
     window.addEventListener('popstate', handlePopState);
-    return () => window.removeEventListener('popstate', handlePopState);
+    window.addEventListener('storage', syncCurrentUser);
+    window.addEventListener('focus', syncCurrentUser);
+    document.addEventListener('visibilitychange', syncCurrentUser);
+
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+      window.removeEventListener('storage', syncCurrentUser);
+      window.removeEventListener('focus', syncCurrentUser);
+      document.removeEventListener('visibilitychange', syncCurrentUser);
+    };
   }, []);
 
   const navigate = useCallback((path) => {

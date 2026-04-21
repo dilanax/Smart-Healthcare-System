@@ -21,12 +21,22 @@ foreach ($forward in $forwards) {
     $service = $forward.Name
     $port = $forward.Port
     $logFile = Join-Path $logDir "$service-port-forward.log"
-    $command = "kubectl -n smart-healthcare port-forward svc/$service ${port}:${port}"
+    $command = @"
+while (`$true) {
+    try {
+        kubectl -n smart-healthcare port-forward svc/$service ${port}:${port} *>> '$logFile'
+    } catch {
+        `$_.Exception.Message | Out-File -FilePath '$logFile' -Append
+    }
+
+    Start-Sleep -Seconds 2
+}
+"@
 
     Start-Process powershell -ArgumentList @(
         '-NoProfile',
         '-WindowStyle', 'Minimized',
-        '-Command', "$command *> '$logFile'"
+        '-Command', $command
     ) -WorkingDirectory $root | Out-Null
 }
 

@@ -1,5 +1,21 @@
 # React + Vite
 
+## Windows PowerShell
+
+If `npm run build` or `npm run dev` fails with an error about `npm.ps1` and execution policies, use the Windows command wrappers in this folder instead:
+
+```powershell
+.\build.cmd
+.\dev.cmd
+```
+
+You can also run:
+
+```powershell
+npm.cmd run build
+npm.cmd run dev
+```
+
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
 
 Currently, two official plugins are available:

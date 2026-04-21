@@ -1167,41 +1167,41 @@ const handleLogout = () => {
 
             {!loading && activeTab === 'doctors' ? (
               <div className="space-y-6">
-                <div className="rounded-2xl bg-white p-6 shadow-lg">
-                  <div className="mb-4 flex items-center justify-between">
-                    <h3 className="text-lg font-bold text-gray-800">Add Doctor Profile</h3>
+                <div className="rounded-[28px] border border-teal-100 bg-white p-6 shadow-[0_24px_70px_-36px_rgba(13,148,136,0.45)]">
+                  <div className="mb-5 flex items-center justify-between gap-4 rounded-[24px] bg-[linear-gradient(135deg,#ecfeff_0%,#f8fafc_48%,#ffffff_100%)] px-5 py-4">
+                    <h3 className="text-lg font-bold text-gray-800">Doctor Profile Workspace</h3>
                     <button
                       type="button"
                       onClick={() => loadDoctorProfiles()}
-                      className="rounded-lg border border-teal-200 px-4 py-2 text-sm font-semibold text-teal-700 hover:bg-teal-50"
+                      className="rounded-2xl border border-teal-200 bg-white px-4 py-2.5 text-sm font-semibold text-teal-700 transition hover:bg-teal-50"
                     >
                       Refresh Profiles
                     </button>
                   </div>
                   {editingDoctorId ? (
-                    <div className="mb-4 flex items-center justify-between rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                    <div className="mb-5 flex items-center justify-between rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
                       <span>You are editing doctor profile #{editingDoctorId}.</span>
                       <button
                         type="button"
                         onClick={cancelDoctorProfileEdit}
-                        className="font-semibold text-amber-900 hover:text-amber-950"
+                        className="rounded-xl border border-amber-300 px-4 py-2 font-semibold text-amber-900 transition hover:bg-amber-100"
                       >
                         Cancel Edit
                       </button>
                     </div>
                   ) : null}
-                  <p className="mb-4 text-sm text-gray-500">Create full doctor records with image and details. These records are used by home and appointment pages.</p>
-                  <form onSubmit={submitDoctorProfile} className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-                    <input name="firstName" value={doctorProfileForm.firstName} onChange={handleDoctorProfileChange} placeholder="First name" className="rounded-lg border px-4 py-2 outline-none focus:ring-2 focus:ring-teal-300" />
-                    <input name="lastName" value={doctorProfileForm.lastName} onChange={handleDoctorProfileChange} placeholder="Last name" className="rounded-lg border px-4 py-2 outline-none focus:ring-2 focus:ring-teal-300" />
-                    <input name="specialization" value={doctorProfileForm.specialization} onChange={handleDoctorProfileChange} placeholder="Specialization" className="rounded-lg border px-4 py-2 outline-none focus:ring-2 focus:ring-teal-300" />
-                    <input name="hospital" value={doctorProfileForm.hospital} onChange={handleDoctorProfileChange} placeholder="Hospital" className="rounded-lg border px-4 py-2 outline-none focus:ring-2 focus:ring-teal-300" />
-                    <input name="email" type="email" value={doctorProfileForm.email} onChange={handleDoctorProfileChange} placeholder="Doctor login email" className="rounded-lg border px-4 py-2 outline-none focus:ring-2 focus:ring-teal-300" />
-                    {!editingDoctorId ? <div className="space-y-2"><input name="loginPassword" type="text" value={doctorProfileForm.loginPassword} onChange={handleDoctorProfileChange} placeholder="Doctor login password" className="w-full rounded-lg border px-4 py-2 outline-none focus:ring-2 focus:ring-teal-300" /><div className="flex items-center justify-between gap-2"><p className="text-xs text-slate-500">Use at least 8 chars with A-Z, a-z, number and symbol.</p><button type="button" onClick={() => setDoctorProfileForm((prev) => ({ ...prev, loginPassword: generateDoctorPassword() }))} className="rounded-md border border-teal-300 px-3 py-1 text-xs font-semibold text-teal-700 hover:bg-teal-50">Auto Generate</button></div></div> : null}
-                    <input name="phoneNumber" value={doctorProfileForm.phoneNumber} onChange={handleDoctorProfileChange} placeholder="Phone number" className="rounded-lg border px-4 py-2 outline-none focus:ring-2 focus:ring-teal-300" />
-                    <div className="col-span-1 md:col-span-2">
+                  <p className="mb-5 max-w-3xl text-sm leading-6 text-gray-500">Create full doctor records with image and details. These records are used by home and appointment pages.</p>
+                  <form onSubmit={submitDoctorProfile} className="mx-auto flex w-full max-w-3xl flex-col gap-4 rounded-3xl border border-slate-200 bg-slate-50/70 p-5">
+                    <input name="firstName" value={doctorProfileForm.firstName} onChange={handleDoctorProfileChange} placeholder="First name" className="rounded-xl border border-slate-200 bg-white px-4 py-3 outline-none transition focus:border-teal-300 focus:ring-2 focus:ring-teal-200" />
+                    <input name="lastName" value={doctorProfileForm.lastName} onChange={handleDoctorProfileChange} placeholder="Last name" className="rounded-xl border border-slate-200 bg-white px-4 py-3 outline-none transition focus:border-teal-300 focus:ring-2 focus:ring-teal-200" />
+                    <input name="specialization" value={doctorProfileForm.specialization} onChange={handleDoctorProfileChange} placeholder="Specialization" className="rounded-xl border border-slate-200 bg-white px-4 py-3 outline-none transition focus:border-teal-300 focus:ring-2 focus:ring-teal-200" />
+                    <input name="hospital" value={doctorProfileForm.hospital} onChange={handleDoctorProfileChange} placeholder="Hospital" className="rounded-xl border border-slate-200 bg-white px-4 py-3 outline-none transition focus:border-teal-300 focus:ring-2 focus:ring-teal-200" />
+                    <input name="email" type="email" value={doctorProfileForm.email} onChange={handleDoctorProfileChange} placeholder="Doctor login email" className="rounded-xl border border-slate-200 bg-white px-4 py-3 outline-none transition focus:border-teal-300 focus:ring-2 focus:ring-teal-200" />
+                    {!editingDoctorId ? <div className="space-y-2 rounded-2xl border border-dashed border-teal-200 bg-white p-3"><input name="loginPassword" type="text" value={doctorProfileForm.loginPassword} onChange={handleDoctorProfileChange} placeholder="Doctor login password" className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 outline-none transition focus:border-teal-300 focus:ring-2 focus:ring-teal-200" /><div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><p className="text-xs text-slate-500">Use at least 8 chars with A-Z, a-z, number and symbol.</p><button type="button" onClick={() => setDoctorProfileForm((prev) => ({ ...prev, loginPassword: generateDoctorPassword() }))} className="rounded-lg border border-teal-300 px-3 py-1.5 text-xs font-semibold text-teal-700 transition hover:bg-teal-50">Auto Generate</button></div></div> : null}
+                    <input name="phoneNumber" value={doctorProfileForm.phoneNumber} onChange={handleDoctorProfileChange} placeholder="Phone number" className="rounded-xl border border-slate-200 bg-white px-4 py-3 outline-none transition focus:border-teal-300 focus:ring-2 focus:ring-teal-200" />
+                    <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-4">
                       <label className="mb-2 block text-sm font-semibold text-gray-700">Doctor Image</label>
-                      <div className="flex gap-2">
+                      <div className="flex flex-col gap-3">
                         <input type="file" accept="image/*" onChange={(e) => {
                           const file = e.target.files?.[0];
                           if (file) setDoctorImageFile(file);
@@ -1210,27 +1210,27 @@ const handleLogout = () => {
                       </div>
                       <p className="mt-1 text-xs text-gray-500">Or enter image URL below if you prefer</p>
                     </div>
-                    <input name="imageUrl" value={doctorProfileForm.imageUrl} onChange={handleDoctorProfileChange} placeholder="Doctor image URL (optional if file selected)" className="rounded-lg border px-4 py-2 outline-none focus:ring-2 focus:ring-teal-300" />
-                    <select name="availability" value={doctorProfileForm.availability} onChange={handleDoctorProfileChange} className="rounded-lg border px-4 py-2 outline-none focus:ring-2 focus:ring-teal-300">
+                    <input name="imageUrl" value={doctorProfileForm.imageUrl} onChange={handleDoctorProfileChange} placeholder="Doctor image URL (optional if file selected)" className="rounded-xl border border-slate-200 bg-white px-4 py-3 outline-none transition focus:border-teal-300 focus:ring-2 focus:ring-teal-200" />
+                    <select name="availability" value={doctorProfileForm.availability} onChange={handleDoctorProfileChange} className="rounded-xl border border-slate-200 bg-white px-4 py-3 outline-none transition focus:border-teal-300 focus:ring-2 focus:ring-teal-200">
                       <option value="Available Today">Available Today</option>
                       <option value="Available Tomorrow">Available Tomorrow</option>
                       <option value="On Leave">On Leave</option>
                     </select>
-                    <input type="number" min="0" name="consultationFee" value={doctorProfileForm.consultationFee} onChange={handleDoctorProfileChange} placeholder="Consultation Fee" className="rounded-lg border px-4 py-2 outline-none focus:ring-2 focus:ring-teal-300" />
-                    <input type="number" min="0" max="5" step="0.1" name="rating" value={doctorProfileForm.rating} onChange={handleDoctorProfileChange} placeholder="Rating" className="rounded-lg border px-4 py-2 outline-none focus:ring-2 focus:ring-teal-300" />
-                    <input type="number" min="0" name="experienceYears" value={doctorProfileForm.experienceYears} onChange={handleDoctorProfileChange} placeholder="Experience years" className="rounded-lg border px-4 py-2 outline-none focus:ring-2 focus:ring-teal-300" />
-                    <input type="number" min="0" name="patientCount" value={doctorProfileForm.patientCount} onChange={handleDoctorProfileChange} placeholder="Patient count" className="rounded-lg border px-4 py-2 outline-none focus:ring-2 focus:ring-teal-300" />
-                    <div className="md:col-span-2 lg:col-span-3">
-                      {doctorProfileError ? <p className="mb-3 text-sm text-rose-600">{doctorProfileError}</p> : null}
+                    <input type="number" min="0" name="consultationFee" value={doctorProfileForm.consultationFee} onChange={handleDoctorProfileChange} placeholder="Consultation Fee" className="rounded-xl border border-slate-200 bg-white px-4 py-3 outline-none transition focus:border-teal-300 focus:ring-2 focus:ring-teal-200" />
+                    <input type="number" min="0" max="5" step="0.1" name="rating" value={doctorProfileForm.rating} onChange={handleDoctorProfileChange} placeholder="Rating" className="rounded-xl border border-slate-200 bg-white px-4 py-3 outline-none transition focus:border-teal-300 focus:ring-2 focus:ring-teal-200" />
+                    <input type="number" min="0" name="experienceYears" value={doctorProfileForm.experienceYears} onChange={handleDoctorProfileChange} placeholder="Experience years" className="rounded-xl border border-slate-200 bg-white px-4 py-3 outline-none transition focus:border-teal-300 focus:ring-2 focus:ring-teal-200" />
+                    <input type="number" min="0" name="patientCount" value={doctorProfileForm.patientCount} onChange={handleDoctorProfileChange} placeholder="Patient count" className="rounded-xl border border-slate-200 bg-white px-4 py-3 outline-none transition focus:border-teal-300 focus:ring-2 focus:ring-teal-200" />
+                    <div>
+                      {doctorProfileError ? <p className="mb-3 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-600">{doctorProfileError}</p> : null}
                       <div className="flex flex-wrap gap-3">
-                        <button type="submit" disabled={busyId === 'doctor-profile-submit' || uploadingImage} className="rounded-lg bg-teal-600 px-6 py-2 font-semibold text-white hover:bg-teal-700 disabled:opacity-50">
+                        <button type="submit" disabled={busyId === 'doctor-profile-submit' || uploadingImage} className="rounded-2xl bg-teal-600 px-6 py-3 font-semibold text-white transition hover:bg-teal-700 disabled:opacity-50">
                           {uploadingImage ? 'Uploading image...' : busyId === 'doctor-profile-submit' ? 'Saving...' : editingDoctorId ? 'Update Doctor Profile' : 'Add Doctor Profile'}
                         </button>
                         {editingDoctorId ? (
                           <button
                             type="button"
                             onClick={cancelDoctorProfileEdit}
-                            className="rounded-lg border border-slate-300 px-6 py-2 font-semibold text-slate-700 hover:bg-slate-50"
+                            className="rounded-2xl border border-slate-300 px-6 py-3 font-semibold text-slate-700 transition hover:bg-slate-100"
                           >
                             Cancel
                           </button>
@@ -1240,21 +1240,35 @@ const handleLogout = () => {
                   </form>
                 </div>
 
-                <div className="rounded-2xl bg-white p-6 shadow-lg">
-                  <h3 className="mb-4 text-lg font-bold text-gray-800">Doctor Profiles</h3>
+                <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-[0_24px_70px_-36px_rgba(15,23,42,0.22)]">
+                  <div className="mb-5 flex items-end justify-between gap-4">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Directory</p>
+                      <h3 className="mt-2 text-2xl font-bold tracking-tight text-slate-900">Doctor Profiles</h3>
+                    </div>
+                    <div className="rounded-2xl bg-slate-100 px-4 py-2.5 text-right">
+                      <p className="text-[11px] uppercase tracking-[0.22em] text-slate-400">Total</p>
+                      <p className="text-xl font-bold text-slate-900">{doctorProfiles.length}</p>
+                    </div>
+                  </div>
                   <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-                    {doctorProfiles.length === 0 ? <p className="text-sm text-slate-500">No doctor profiles found.</p> : doctorProfiles.map((doctor) => (
-                      <div key={doctor.userId} className="rounded-xl border p-4">
-                        <img src={doctor.imageUrl || `https://i.pravatar.cc/200?u=${doctor.userId}`} alt={`${doctor.firstName} ${doctor.lastName}`} className="mb-3 h-40 w-full rounded-lg object-cover" />
-                        <div className="mb-2 flex items-center justify-between"><h4 className="font-bold text-gray-800">Dr. {doctor.firstName} {doctor.lastName}</h4><span className="rounded-full bg-teal-100 px-2 py-1 text-xs font-medium text-teal-700">{doctor.availability || 'Available Today'}</span></div>
-                        <p className="text-sm text-teal-600">{doctor.specialization || doctor.specialty || 'General Medicine'}</p>
-                        <p className="mt-1 text-sm text-gray-500">Hospital: {doctor.hospital || 'N/A'}</p>
-                        <p className="mt-1 text-sm text-gray-500">Email: {doctor.email || 'N/A'}</p>
+                    {doctorProfiles.length === 0 ? <div className="rounded-3xl border border-dashed border-slate-300 bg-slate-50 px-6 py-12 text-center text-sm text-slate-500 md:col-span-2 lg:col-span-3">No doctor profiles found.</div> : doctorProfiles.map((doctor) => (
+                      <div key={doctor.userId} className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg">
+                        <img src={doctor.imageUrl || `https://i.pravatar.cc/200?u=${doctor.userId}`} alt={`${doctor.firstName} ${doctor.lastName}`} className="h-48 w-full object-cover" />
+                        <div className="p-5">
+                        <div className="mb-3 flex items-center justify-between"><h4 className="font-bold text-gray-800">Dr. {doctor.firstName} {doctor.lastName}</h4><span className="rounded-full bg-teal-100 px-3 py-1 text-xs font-medium text-teal-700">{doctor.availability || 'Available Today'}</span></div>
+                        <p className="text-sm font-semibold text-teal-600">{doctor.specialization || doctor.specialty || 'General Medicine'}</p>
+                        <div className="mt-4 grid grid-cols-2 gap-3">
+                          <div className="rounded-2xl bg-slate-50 px-3 py-2"><p className="text-[11px] uppercase tracking-[0.2em] text-slate-400">Fee</p><p className="mt-1 font-bold text-slate-900">LKR {doctor.consultationFee || 0}</p></div>
+                          <div className="rounded-2xl bg-slate-50 px-3 py-2"><p className="text-[11px] uppercase tracking-[0.2em] text-slate-400">Rating</p><p className="mt-1 font-bold text-slate-900">{doctor.rating ?? 'N/A'}</p></div>
+                        </div>
+                        <p className="mt-3 text-sm text-gray-500">Hospital: {doctor.hospital || 'N/A'}</p>
+                        <p className="mt-1 break-all text-sm text-gray-500">Email: {doctor.email || 'N/A'}</p>
                         <p className="mt-1 text-sm text-gray-500">Phone: {doctor.phoneNumber || 'N/A'}</p>
-                        <p className="mt-1 text-sm text-gray-500">Fee: LKR {doctor.consultationFee || 0}</p>
-                        <div className="mt-4 flex gap-2">
-                          <button type="button" onClick={() => startEditDoctorProfile(doctor)} className="flex-1 rounded-lg border border-teal-300 py-2 font-medium text-teal-700 hover:bg-teal-50">Edit</button>
-                          <button type="button" onClick={() => removeDoctorProfile(doctor.userId)} disabled={busyId === doctor.userId} className="flex-1 rounded-lg border border-rose-300 py-2 font-medium text-rose-700 hover:bg-rose-50 disabled:opacity-50">Delete</button>
+                        <div className="mt-4 flex gap-3">
+                          <button type="button" onClick={() => startEditDoctorProfile(doctor)} className="flex-1 rounded-2xl border border-teal-300 py-2.5 font-medium text-teal-700 transition hover:bg-teal-50">Edit</button>
+                          <button type="button" onClick={() => removeDoctorProfile(doctor.userId)} disabled={busyId === doctor.userId} className="flex-1 rounded-2xl border border-rose-300 py-2.5 font-medium text-rose-700 transition hover:bg-rose-50 disabled:opacity-50">Delete</button>
+                        </div>
                         </div>
                       </div>
                     ))}

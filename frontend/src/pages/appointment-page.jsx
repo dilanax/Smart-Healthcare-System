@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import Navbar from '../components/navbar';
+import { getStoredUser } from '../lib/auth';
 
 const getDoctorId = (doctor) => Number(doctor?.userId ?? doctor?.id ?? 0);
 const STORAGE_KEY_REPORTS = 'doctor_patient_reports';
@@ -28,6 +29,8 @@ const readFileAsDataUrl = (file) =>
   });
 
 const AppointmentPage = ({ navigate, currentUser }) => {
+  const storedUser = getStoredUser();
+  const activeUser = currentUser?.userId ? currentUser : storedUser;
   const [doctors, setDoctors] = useState([]);
   const [selectedDoctor, setSelectedDoctor] = useState(null);
   const [appointmentDate, setAppointmentDate] = useState('');
@@ -51,15 +54,24 @@ const AppointmentPage = ({ navigate, currentUser }) => {
     searchDate: '',
   });
   const [userDetails, setUserDetails] = useState({
-    name: currentUser?.name || '',
-    email: currentUser?.email || '',
-    phone: currentUser?.phone || '',
+    name: activeUser?.name || '',
+    email: activeUser?.email || '',
+    phone: activeUser?.phone || activeUser?.phoneNumber || '',
     age: '',
     gender: '',
   });
 
-  const patientId = currentUser?.userId || '';
+  const patientId = activeUser?.userId || activeUser?.id || '';
   const selectedDoctorId = getDoctorId(selectedDoctor);
+
+  useEffect(() => {
+    setUserDetails((prev) => ({
+      ...prev,
+      name: activeUser?.name || prev.name || '',
+      email: activeUser?.email || prev.email || '',
+      phone: activeUser?.phone || activeUser?.phoneNumber || prev.phone || '',
+    }));
+  }, [activeUser?.email, activeUser?.name, activeUser?.phone, activeUser?.phoneNumber]);
 
   useEffect(() => {
     if (!selectedDoctorId || !patientId) {
@@ -328,7 +340,7 @@ const AppointmentPage = ({ navigate, currentUser }) => {
         size: `${(file.size / 1024).toFixed(1)} KB`,
         uploadedAt: new Date().toISOString(),
         patientId: Number(patientId) || null,
-        patientName: userDetails.name?.trim() || currentUser?.name || 'Patient',
+        patientName: userDetails.name?.trim() || activeUser?.name || 'Patient',
         doctorId: selectedDoctorId,
         doctorName: `Dr. ${selectedDoctor.firstName} ${selectedDoctor.lastName}`,
         appointmentId: null,
@@ -406,7 +418,7 @@ const AppointmentPage = ({ navigate, currentUser }) => {
                   appointmentDate: appointmentDate || report.appointmentDate || '',
                   appointmentTime: selectedTime || report.appointmentTime || '',
                   notes: reason.trim() || report.notes || '',
-                  patientName: userDetails.name?.trim() || report.patientName || 'Patient',
+                  patientName: userDetails.name?.trim() || activeUser?.name || report.patientName || 'Patient',
                 }
               : report
           );
