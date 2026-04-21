@@ -57,6 +57,35 @@ const saveStorage = (key, value) => {
   } catch {}
 };
 
+const readFileAsDataUrl = (file) =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(new Error('Failed to read selected file.'));
+    reader.readAsDataURL(file);
+  });
+
+const dataUrlToBlobUrl = (dataUrl) => {
+  if (!dataUrl || typeof dataUrl !== 'string' || !dataUrl.startsWith('data:')) {
+    return null;
+  }
+
+  const [meta, content] = dataUrl.split(',');
+  if (!meta || !content) return null;
+
+  const mimeMatch = meta.match(/data:(.*?);base64/);
+  const mimeType = mimeMatch?.[1] || 'application/octet-stream';
+  const binary = window.atob(content);
+  const bytes = new Uint8Array(binary.length);
+
+  for (let i = 0; i < binary.length; i += 1) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+
+  const blob = new Blob([bytes], { type: mimeType });
+  return URL.createObjectURL(blob);
+};
+
 const emptyAvailability = () =>
   WEEK_DAYS.reduce((acc, day) => {
     acc[day] = { enabled: false, slots: [] };
@@ -119,19 +148,39 @@ const StatCard = ({ title, value, icon, color, note }) => (
   </div>
 );
 
-const Modal = ({ title, onClose, children }) => (
-  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-    <div className="w-full max-w-lg rounded-2xl bg-white shadow-2xl">
-      <div className="flex items-center justify-between border-b px-6 py-4">
-        <h3 className="text-lg font-bold text-gray-800">{title}</h3>
-        <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
-          <i className="fas fa-times text-xl" />
-        </button>
+const Modal = ({ title, onClose, children }) => {
+  useEffect(() => {
+    const handleEscape = (event) => {
+      if (event.key === 'Escape') onClose();
+    };
+
+    window.addEventListener('keydown', handleEscape);
+    return () => window.removeEventListener('keydown', handleEscape);
+  }, [onClose]);
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-lg rounded-2xl bg-white shadow-2xl"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="flex items-center justify-between border-b px-6 py-4">
+          <h3 className="text-lg font-bold text-gray-800">{title}</h3>
+          <button
+            onClick={onClose}
+            className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-medium text-gray-600 hover:bg-gray-50"
+          >
+            Close
+          </button>
+        </div>
+        <div className="px-6 py-5">{children}</div>
       </div>
-      <div className="px-6 py-5">{children}</div>
     </div>
-  </div>
-);
+  );
+};
 
 // ─── Main Dashboard ───────────────────────────────────────────────────────────
 const DoctorDashboard = ({ navigate, currentUser, refreshUser }) => {
@@ -181,6 +230,17 @@ const DoctorDashboard = ({ navigate, currentUser, refreshUser }) => {
   const doctorFirstName = currentUser?.firstName ?? nameFromPayload.firstName;
   const doctorLastName = currentUser?.lastName ?? nameFromPayload.lastName;
   const doctorName = `${doctorFirstName ?? ''} ${doctorLastName ?? ''}`.trim() || 'Doctor';
+  const visiblePatientReports = patientReports.filter(
+    (report) => !report?.doctorId || Number(report.doctorId) === Number(doctorUserId)
+  );
+  const selectedApptReports = selectedAppt
+    ? visiblePatientReports.filter((report) => {
+        if (report?.appointmentId) {
+          return Number(report.appointmentId) === Number(selectedAppt.appointmentId);
+        }
+        return Number(report?.patientId) === Number(selectedAppt.patientId);
+      })
+    : [];
 
   // ── Redirect if not doctor ──────────────────────────────────────────────
   useEffect(() => {
@@ -256,6 +316,10 @@ const DoctorDashboard = ({ navigate, currentUser, refreshUser }) => {
     fetchAppointments();
     fetchProfile();
   }, [fetchAppointments, fetchProfile]);
+
+  useEffect(() => {
+    setPatientReports(loadStorage(STORAGE_KEY_REPORTS, []));
+  }, [activeTab]);
 
   // ── Clear flash messages ────────────────────────────────────────────────
   useEffect(() => {
@@ -484,22 +548,32 @@ const DoctorDashboard = ({ navigate, currentUser, refreshUser }) => {
   };
 
   // ── Patient Reports (simulated upload) ─────────────────────────────────
-  const handleReportUpload = (e) => {
+  const handleReportUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
-    const newReport = {
-      id: Date.now(),
-      fileName: file.name,
-      type: file.type,
-      size: (file.size / 1024).toFixed(1) + ' KB',
-      uploadedAt: new Date().toISOString(),
-      patientId: '',
-      patientName: '',
-      notes: '',
-    };
-    const updated = [newReport, ...patientReports];
-    setPatientReports(updated);
-    saveStorage(STORAGE_KEY_REPORTS, updated);
+
+    try {
+      const fileUrl = await readFileAsDataUrl(file);
+      const newReport = {
+        id: Date.now(),
+        fileName: file.name,
+        type: file.type,
+        size: (file.size / 1024).toFixed(1) + ' KB',
+        uploadedAt: new Date().toISOString(),
+        patientId: '',
+        patientName: '',
+        notes: '',
+        doctorId: doctorUserId,
+        doctorName: `Dr. ${doctorName}`,
+        fileUrl,
+      };
+      const updated = [newReport, ...patientReports];
+      setPatientReports(updated);
+      saveStorage(STORAGE_KEY_REPORTS, updated);
+    } catch (e) {
+      setError(e.message || 'Could not prepare the selected report.');
+    }
+
     e.target.value = '';
   };
 
@@ -507,6 +581,35 @@ const DoctorDashboard = ({ navigate, currentUser, refreshUser }) => {
     const updated = patientReports.filter((r) => r.id !== id);
     setPatientReports(updated);
     saveStorage(STORAGE_KEY_REPORTS, updated);
+  };
+
+  const openReport = (report) => {
+    if (!report?.fileUrl) {
+      setError('This report does not have a stored file to open. Please upload it again.');
+      return;
+    }
+
+    const blobUrl = report.fileUrl.startsWith('data:')
+      ? dataUrlToBlobUrl(report.fileUrl)
+      : report.fileUrl;
+
+    if (!blobUrl) {
+      setError('This report format could not be opened. Please upload it again.');
+      return;
+    }
+
+    const openedWindow = window.open(blobUrl, '_blank', 'noopener,noreferrer');
+    if (!openedWindow) {
+      setError('Popup was blocked by the browser. Allow popups and try again.');
+      if (blobUrl.startsWith('blob:')) {
+        URL.revokeObjectURL(blobUrl);
+      }
+      return;
+    }
+
+    if (blobUrl.startsWith('blob:')) {
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 60_000);
+    }
   };
 
   // ── Derived stats ───────────────────────────────────────────────────────
@@ -1296,7 +1399,7 @@ const DoctorDashboard = ({ navigate, currentUser, refreshUser }) => {
                 </label>
               </div>
 
-              {patientReports.length === 0 ? (
+              {visiblePatientReports.length === 0 ? (
                 <div className="rounded-2xl bg-white p-8 text-center text-gray-500 shadow-lg">
                   <i className="fas fa-file-medical text-4xl text-gray-300" />
                   <p className="mt-2">No patient reports uploaded yet.</p>
@@ -1304,7 +1407,7 @@ const DoctorDashboard = ({ navigate, currentUser, refreshUser }) => {
                 </div>
               ) : (
                 <div className="grid gap-4">
-                  {patientReports.map((r) => (
+                  {visiblePatientReports.map((r) => (
                     <div key={r.id} className="flex items-center justify-between rounded-2xl bg-white p-5 shadow-lg">
                       <div className="flex items-center gap-4">
                         <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
@@ -1321,6 +1424,13 @@ const DoctorDashboard = ({ navigate, currentUser, refreshUser }) => {
                         </div>
                       </div>
                       <div className="flex gap-2">
+                        <button
+                          onClick={() => openReport(r)}
+                          className="rounded-lg bg-teal-50 px-3 py-1.5 text-xs font-medium text-teal-700 hover:bg-teal-100"
+                        >
+                          <i className="fas fa-eye mr-1" />
+                          Open
+                        </button>
                         <button
                           onClick={() => deleteReport(r.id)}
                           className="rounded-lg bg-red-50 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-100"
@@ -1404,6 +1514,51 @@ const DoctorDashboard = ({ navigate, currentUser, refreshUser }) => {
             <div className="rounded-xl bg-gray-50 p-3">
               <p className="text-xs text-gray-500">Created</p>
               <p>{formatDateTime(selectedAppt.createdAt)}</p>
+            </div>
+            <div className="rounded-xl bg-gray-50 p-3">
+              <div className="mb-3 flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-gray-500">Uploaded Documents</p>
+                  <p className="text-xs text-gray-400">Files attached by the patient for this appointment.</p>
+                </div>
+                <span className="rounded-full bg-teal-100 px-2 py-1 text-xs font-semibold text-teal-700">
+                  {selectedApptReports.length}
+                </span>
+              </div>
+
+              {selectedApptReports.length === 0 ? (
+                <p className="text-sm text-gray-500">No patient documents uploaded for this appointment yet.</p>
+              ) : (
+                <div className="space-y-2">
+                  {selectedApptReports.map((report) => (
+                    <div
+                      key={report.id}
+                      className="flex flex-col gap-2 rounded-xl border border-gray-200 bg-white p-3 sm:flex-row sm:items-center sm:justify-between"
+                    >
+                      <div>
+                        <p className="font-semibold text-gray-800">{report.fileName}</p>
+                        <p className="text-xs text-gray-500">
+                          {report.size} · Uploaded {formatDateTime(report.uploadedAt)}
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => openReport(report)}
+                        className="rounded-lg bg-teal-600 px-3 py-2 text-xs font-semibold text-white hover:bg-teal-700"
+                      >
+                        <i className="fas fa-eye mr-1" />
+                        Open File
+                      </button>
+                      <button
+                        onClick={() => deleteReport(report.id)}
+                        className="rounded-lg bg-red-50 px-3 py-2 text-xs font-semibold text-red-600 hover:bg-red-100"
+                      >
+                        <i className="fas fa-trash-alt mr-1" />
+                        Remove
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             {selectedAppt.status === 'PENDING' && (

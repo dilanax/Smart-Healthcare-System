@@ -569,15 +569,19 @@ const approvePayment = async (paymentId) => {
 
     try {
       const response = await fetch(`http://localhost:8085/api/appointments/${appointmentId}`, {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' }
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'CANCELLED' })
       });
 
       if (response.ok) {
+        const updatedAppointment = await response.json();
         setAppointments((prev) =>
-          prev.filter((apt) => apt.appointmentId !== appointmentId)
+          prev.map((apt) => apt.appointmentId === appointmentId ? updatedAppointment : apt)
         );
-        setSelectedAppointment(null);
+        setSelectedAppointment((prev) =>
+          prev?.appointmentId === appointmentId ? updatedAppointment : prev
+        );
         setSuccess('Appointment cancelled successfully.');
       } else {
         throw new Error('Failed to cancel appointment');
@@ -619,10 +623,22 @@ const approvePayment = async (paymentId) => {
     setSuccess('');
 
     try {
+      const appointmentPayload = {
+        patientId: selectedAppointment.patientId,
+        doctorId: selectedAppointment.doctorId,
+        doctorFirstName: selectedAppointment.doctorFirstName || '',
+        doctorLastName: selectedAppointment.doctorLastName || '',
+        appointmentDate: editAppointmentForm.appointmentDate,
+        appointmentTime: editAppointmentForm.appointmentTime,
+        reason: editAppointmentForm.reason,
+        status: editAppointmentForm.status || selectedAppointment.status || 'PENDING',
+        token: selectedAppointment.token || '',
+      };
+
       const response = await fetch(`http://localhost:8085/api/appointments/${selectedAppointment.appointmentId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(editAppointmentForm)
+        body: JSON.stringify(appointmentPayload)
       });
 
       if (response.ok) {
@@ -630,8 +646,8 @@ const approvePayment = async (paymentId) => {
         setAppointments((prev) =>
           prev.map((apt) => apt.appointmentId === selectedAppointment.appointmentId ? updatedAppointment : apt)
         );
+        setSelectedAppointment(updatedAppointment);
         setShowEditAppointmentModal(false);
-        setSelectedAppointment(null);
         setSuccess('Appointment updated successfully.');
       } else {
         throw new Error('Failed to update appointment');

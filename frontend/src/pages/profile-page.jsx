@@ -51,6 +51,28 @@ const ProfilePage = ({ navigate, currentUser }) => {
     fetchData();
   }, [currentUser, navigate]);
 
+  useEffect(() => {
+    if (!currentUser) return undefined;
+
+    const handleWindowFocus = () => {
+      fetchData();
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        fetchData();
+      }
+    };
+
+    window.addEventListener('focus', handleWindowFocus);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      window.removeEventListener('focus', handleWindowFocus);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [currentUser]);
+
   // Forces React to fill the edit form boxes when data loads
   useEffect(() => {
     if (userDetails) {

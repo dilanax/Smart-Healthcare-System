@@ -2,6 +2,30 @@ import { useState, useEffect } from 'react';
 import Navbar from '../components/navbar';
 
 const getDoctorId = (doctor) => Number(doctor?.userId ?? doctor?.id ?? 0);
+const STORAGE_KEY_REPORTS = 'doctor_patient_reports';
+
+const loadStoredReports = () => {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY_REPORTS);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+};
+
+const saveStoredReports = (reports) => {
+  try {
+    localStorage.setItem(STORAGE_KEY_REPORTS, JSON.stringify(reports));
+  } catch {}
+};
+
+const readFileAsDataUrl = (file) =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(new Error('Failed to read selected file.'));
+    reader.readAsDataURL(file);
+  });
 
 const AppointmentPage = ({ navigate, currentUser }) => {
   const [doctors, setDoctors] = useState([]);
@@ -17,6 +41,7 @@ const AppointmentPage = ({ navigate, currentUser }) => {
   const [generatedToken, setGeneratedToken] = useState('');
   const [bookedSlots, setBookedSlots] = useState([]); // Store booked time slots
   const [loadingSlots, setLoadingSlots] = useState(false);
+  const [uploadedDocuments, setUploadedDocuments] = useState([]);
   
   // Search filters
   const [searchFilters, setSearchFilters] = useState({
@@ -34,6 +59,23 @@ const AppointmentPage = ({ navigate, currentUser }) => {
   });
 
   const patientId = currentUser?.userId || '';
+  const selectedDoctorId = getDoctorId(selectedDoctor);
+
+  useEffect(() => {
+    if (!selectedDoctorId || !patientId) {
+      setUploadedDocuments([]);
+      return;
+    }
+
+    const reports = loadStoredReports();
+    setUploadedDocuments(
+      reports.filter(
+        (report) =>
+          Number(report?.doctorId) === Number(selectedDoctorId) &&
+          Number(report?.patientId) === Number(patientId)
+      )
+    );
+  }, [selectedDoctorId, patientId]);
 
   // Generate appointment token
   const generateToken = () => {
@@ -258,6 +300,58 @@ const AppointmentPage = ({ navigate, currentUser }) => {
     if (errors.reason) setErrors((prev) => ({ ...prev, reason: '' }));
   };
 
+  const syncUploadedDocuments = (updatedReports) => {
+    saveStoredReports(updatedReports);
+    setUploadedDocuments(
+      updatedReports.filter(
+        (report) =>
+          Number(report?.doctorId) === Number(selectedDoctorId) &&
+          Number(report?.patientId) === Number(patientId)
+      )
+    );
+  };
+
+  const handleDocumentUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file || !selectedDoctor) {
+      e.target.value = '';
+      return;
+    }
+
+    try {
+      const fileUrl = await readFileAsDataUrl(file);
+
+      const newReport = {
+        id: Date.now(),
+        fileName: file.name,
+        type: file.type || 'application/octet-stream',
+        size: `${(file.size / 1024).toFixed(1)} KB`,
+        uploadedAt: new Date().toISOString(),
+        patientId: Number(patientId) || null,
+        patientName: userDetails.name?.trim() || currentUser?.name || 'Patient',
+        doctorId: selectedDoctorId,
+        doctorName: `Dr. ${selectedDoctor.firstName} ${selectedDoctor.lastName}`,
+        appointmentId: null,
+        appointmentDate: appointmentDate || '',
+        appointmentTime: selectedTime || '',
+        notes: reason.trim(),
+        fileUrl,
+      };
+
+      const updatedReports = [newReport, ...loadStoredReports()];
+      syncUploadedDocuments(updatedReports);
+    } catch (error) {
+      setServerError(error.message || 'Could not prepare the selected document.');
+    }
+
+    e.target.value = '';
+  };
+
+  const removeUploadedDocument = (reportId) => {
+    const updatedReports = loadStoredReports().filter((report) => report.id !== reportId);
+    syncUploadedDocuments(updatedReports);
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setServerError('');
@@ -301,6 +395,23 @@ const AppointmentPage = ({ navigate, currentUser }) => {
          const appointmentResult = await response.json();
          const appointmentId =
          appointmentResult.appointmentId || appointmentResult.id;
+
+         if (appointmentId && uploadedDocuments.length > 0) {
+          const reportIds = new Set(uploadedDocuments.map((report) => report.id));
+          const updatedReports = loadStoredReports().map((report) =>
+            reportIds.has(report.id)
+              ? {
+                  ...report,
+                  appointmentId,
+                  appointmentDate: appointmentDate || report.appointmentDate || '',
+                  appointmentTime: selectedTime || report.appointmentTime || '',
+                  notes: reason.trim() || report.notes || '',
+                  patientName: userDetails.name?.trim() || report.patientName || 'Patient',
+                }
+              : report
+          );
+          syncUploadedDocuments(updatedReports);
+         }
 
          setGeneratedToken(token);
          setSuccess(`✅ Appointment booked successfully! Your Appointment Token: ${token}`);
@@ -568,6 +679,9 @@ const AppointmentPage = ({ navigate, currentUser }) => {
                     Dr. {selectedDoctor.firstName} {selectedDoctor.lastName}
                   </h2>
                   <p className="text-teal-100 text-lg font-semibold">{selectedDoctor.specialization || selectedDoctor.specialty || 'Specialist'}</p>
+                  <p className="mt-2 text-sm text-teal-50">
+                    Upload your medical documents here for this doctor before you confirm the appointment.
+                  </p>
                   <div className="mt-3 flex gap-6">
                     <div>
                       <p className="text-teal-100 text-sm">Experience</p>
@@ -759,6 +873,65 @@ const AppointmentPage = ({ navigate, currentUser }) => {
                 />
               </div>
             </div>
+          </div>
+
+          {/* Medical Documents */}
+          <div className="rounded-2xl border border-cyan-100 bg-cyan-50 p-6">
+            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+              <div>
+                <h3 className="text-lg font-bold text-gray-800">Medical Documents</h3>
+                <p className="text-sm text-gray-600">
+                  These files will be attached to Dr. {selectedDoctor.firstName} {selectedDoctor.lastName}.
+                </p>
+              </div>
+              <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg bg-teal-600 px-4 py-2 font-semibold text-white transition hover:bg-teal-700">
+                <span>Upload Document</span>
+                <input
+                  type="file"
+                  className="hidden"
+                  accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
+                  onChange={handleDocumentUpload}
+                />
+              </label>
+            </div>
+
+            {uploadedDocuments.length === 0 ? (
+              <div className="mt-4 rounded-xl border border-dashed border-cyan-200 bg-white px-4 py-6 text-center text-sm text-gray-500">
+                No documents uploaded for this doctor yet.
+              </div>
+            ) : (
+              <div className="mt-4 space-y-3">
+                {uploadedDocuments.map((document) => (
+                  <div
+                    key={document.id}
+                    className="flex flex-col gap-3 rounded-xl bg-white p-4 shadow-sm md:flex-row md:items-center md:justify-between"
+                  >
+                    <div>
+                      <p className="font-semibold text-gray-800">{document.fileName}</p>
+                      <p className="text-xs text-gray-500">
+                        {document.size} • Uploaded {new Date(document.uploadedAt).toLocaleString()}
+                      </p>
+                      {document.appointmentId ? (
+                        <p className="mt-1 text-xs font-medium text-teal-700">
+                          Linked to appointment #{document.appointmentId}
+                        </p>
+                      ) : (
+                        <p className="mt-1 text-xs font-medium text-amber-700">
+                          This will link to your appointment after booking.
+                        </p>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => removeUploadedDocument(document.id)}
+                      className="rounded-lg bg-red-50 px-3 py-2 text-sm font-semibold text-red-600 transition hover:bg-red-100"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Date Selection */}
