@@ -1,4 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { HiBars3, HiOutlineBell, HiXMark } from 'react-icons/hi2';
+import logoImage from '../assets/Logo.jpg';
 import { clearStoredUser } from '../lib/auth';
 import { fetchNotifications, updateNotificationReadStatus } from '../lib/notifications';
 
@@ -57,6 +59,9 @@ const Navbar = ({ navigate, currentUser }) => {
   ];
 
   const isAdmin = currentUser?.role === 'ADMIN';
+  const displayName = currentUser?.name || currentUser?.email || 'User';
+  const initials = displayName.trim().charAt(0).toUpperCase();
+
   const notificationCategories = [
     'ALL',
     ...Array.from(
@@ -68,17 +73,22 @@ const Navbar = ({ navigate, currentUser }) => {
     ),
   ];
   const unreadNotificationsCount = myNotifications.filter((item) => !item?.read).length;
-  const filteredByReadStatus = selectedReadFilter === 'ALL'
-    ? myNotifications
-    : myNotifications.filter((item) => (selectedReadFilter === 'READ' ? Boolean(item?.read) : !item?.read));
-  const filteredNotifications = selectedCategory === 'ALL'
-    ? filteredByReadStatus
-    : filteredByReadStatus.filter((item) => (item?.relatedService || 'GENERAL').toUpperCase() === selectedCategory);
+  const filteredByReadStatus =
+    selectedReadFilter === 'ALL'
+      ? myNotifications
+      : myNotifications.filter((item) =>
+          selectedReadFilter === 'READ' ? Boolean(item?.read) : !item?.read,
+        );
+  const filteredNotifications =
+    selectedCategory === 'ALL'
+      ? filteredByReadStatus
+      : filteredByReadStatus.filter(
+          (item) => (item?.relatedService || 'GENERAL').toUpperCase() === selectedCategory,
+        );
 
   const getFilteredNotifications = (list) => {
     const email = (currentUser?.email || '').toLowerCase();
     const role = (currentUser?.role || '').toUpperCase();
-
     return list
       .filter((item) => {
         const recipientEmail = (item?.recipientEmail || '').toLowerCase();
@@ -90,7 +100,6 @@ const Navbar = ({ navigate, currentUser }) => {
 
   const loadMyNotifications = async () => {
     if (!currentUser) return;
-
     setBellLoading(true);
     setBellError('');
     try {
@@ -110,7 +119,6 @@ const Navbar = ({ navigate, currentUser }) => {
         setIsBellOpen(false);
       }
     };
-
     document.addEventListener('mousedown', handleOutsideClick);
     return () => document.removeEventListener('mousedown', handleOutsideClick);
   }, []);
@@ -127,9 +135,7 @@ const Navbar = ({ navigate, currentUser }) => {
       }, 120);
     } else {
       const element = document.getElementById(sectionId);
-      if (element) {
-        element.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      }
+      if (element) element.scrollIntoView({ behavior: 'smooth', block: 'start' });
       setActiveLink(sectionId);
     }
     setIsMenuOpen(false);
@@ -146,12 +152,9 @@ const Navbar = ({ navigate, currentUser }) => {
       navigate('/login');
       return;
     }
-
     const next = !isBellOpen;
     setIsBellOpen(next);
-    if (next) {
-      await loadMyNotifications();
-    }
+    if (next) await loadMyNotifications();
   };
 
   const openAllNotifications = async () => {
@@ -159,7 +162,6 @@ const Navbar = ({ navigate, currentUser }) => {
       navigate('/login');
       return;
     }
-
     setSelectedCategory('ALL');
     setSelectedReadFilter('ALL');
     setShowAllNotifications(true);
@@ -174,13 +176,17 @@ const Navbar = ({ navigate, currentUser }) => {
       const response = await updateNotificationReadStatus(notificationId, read);
       const updatedNotification = response?.data;
       if (updatedNotification?.id) {
-        setMyNotifications((prev) => prev.map((item) => (item.id === updatedNotification.id ? updatedNotification : item)));
+        setMyNotifications((prev) =>
+          prev.map((item) => (item.id === updatedNotification.id ? updatedNotification : item)),
+        );
       } else {
-        setMyNotifications((prev) => prev.map((item) => (
-          item.id === notificationId
-            ? { ...item, read, readAt: read ? new Date().toISOString() : null }
-            : item
-        )));
+        setMyNotifications((prev) =>
+          prev.map((item) =>
+            item.id === notificationId
+              ? { ...item, read, readAt: read ? new Date().toISOString() : null }
+              : item,
+          ),
+        );
       }
     } catch (err) {
       setBellError(err.message || 'Failed to update notification read state.');
@@ -191,280 +197,334 @@ const Navbar = ({ navigate, currentUser }) => {
 
   return (
     <>
-      <nav className="sticky top-0 z-50 border-b border-gray-100 bg-white/95 shadow-sm backdrop-blur-md">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="flex h-16 items-center justify-between md:h-20">
+      <nav className="fixed top-0 left-0 right-0 z-50 px-4 pt-4 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-7xl rounded-[26px] border border-slate-200/80 bg-white/92 px-4 py-3 shadow-[0_20px_60px_-32px_rgba(15,23,42,0.4)] backdrop-blur-xl sm:px-6">
+          <div className="flex min-h-[56px] items-center justify-between gap-3">
             <div
-              className="group flex cursor-pointer items-center space-x-2"
+              className="group flex cursor-pointer items-center gap-3"
               onClick={() => scrollToSection('home')}
             >
-              <div className="rounded-xl bg-linear-to-r from-teal-500 to-cyan-600 p-2 shadow-md transition-all group-hover:shadow-lg">
-                <i className="fas fa-hospital-user text-xl text-white"></i>
+              <div className="h-12 w-12 overflow-hidden rounded-2xl shadow-[0_16px_34px_-18px_rgba(6,182,212,0.45)] transition-transform duration-200 group-hover:scale-105">
+                <img
+                  src={logoImage}
+                  alt="HealthCare+ logo"
+                  className="h-full w-full object-cover"
+                />
               </div>
-              <span className="text-2xl font-extrabold tracking-tight">
-                <span className="text-gray-800">Health</span>
-                <span className="text-teal-600">Care+</span>
-              </span>
+              <div className="leading-tight">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-slate-400">
+                  Trusted Care
+                </p>
+                <p className="text-[1.35rem] font-semibold tracking-tight text-slate-900">
+                  Health<span className="text-teal-600">Care+</span>
+                </p>
+              </div>
             </div>
 
-            <div className="hidden items-center space-x-1 md:flex lg:space-x-2">
-              {navLinks.map((link) => (
-                <button
-                  key={link.id}
-                  onClick={() => scrollToSection(link.id)}
-                  className={`flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition-all duration-200 ${
-                    activeLink === link.id
-                      ? 'bg-teal-50 text-teal-700 shadow-sm'
-                      : 'text-gray-600 hover:bg-gray-100 hover:text-teal-600'
-                  }`}
-                >
-                  <i className={`${link.icon} text-sm`}></i>
-                  {link.label}
-                </button>
-              ))}
+            <div className="hidden items-center lg:flex">
+              <div className="flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 p-1 shadow-inner shadow-slate-200/70">
+                {navLinks.map((link) => (
+                  <button
+                    key={link.id}
+                    type="button"
+                    onClick={() => scrollToSection(link.id)}
+                    className={`rounded-full px-4 py-2 text-sm font-medium transition-all duration-200 ${
+                      activeLink === link.id
+                        ? 'bg-white text-slate-900 shadow-sm shadow-slate-300/50'
+                        : 'text-slate-500 hover:bg-white hover:text-slate-900'
+                    }`}
+                  >
+                    {link.label}
+                  </button>
+                ))}
+              </div>
+            </div>
 
-              <div className="relative ml-4" ref={bellRef}>
+            <div className="hidden items-center gap-2 lg:flex">
+              <div className="relative" ref={bellRef}>
                 <button
                   type="button"
                   onClick={handleBellClick}
-                  className="relative rounded-full border border-teal-200 px-3 py-2 text-teal-700 transition hover:bg-teal-50"
+                  className="relative flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:border-slate-300 hover:text-slate-900"
                   aria-label="Open notifications"
                 >
-                  <span className="text-base leading-none" aria-hidden="true">🔔</span>
-                  {currentUser && unreadNotificationsCount > 0 ? (
-                    <span className="absolute -right-1 -top-1 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-rose-500 px-1 text-xs font-bold text-white">
+                  <HiOutlineBell className="text-[18px]" aria-hidden="true" />
+                  {currentUser && unreadNotificationsCount > 0 && (
+                    <span className="absolute -right-1 -top-1 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-bold text-white shadow">
                       {unreadNotificationsCount}
                     </span>
-                  ) : null}
+                  )}
                 </button>
 
-                {isBellOpen ? (
-                  <div className="absolute right-0 z-50 mt-2 w-80 rounded-2xl border border-gray-100 bg-white p-3 shadow-xl">
-                    <div className="mb-2 flex items-center justify-between px-2">
-                      <p className="text-sm font-bold text-gray-800">Notifications</p>
+                {isBellOpen && (
+                  <div className="absolute right-0 z-50 mt-3 w-80 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl ring-1 ring-slate-100">
+                    <div className="flex items-center justify-between border-b border-slate-100 bg-slate-900 px-4 py-3.5">
+                      <p className="text-sm font-bold text-white">Notifications</p>
                       <div className="flex items-center gap-3">
                         <button
                           type="button"
                           onClick={loadMyNotifications}
-                          className="text-xs font-semibold text-teal-700 hover:text-teal-900"
+                          className="text-xs font-semibold text-slate-300 hover:text-white"
                         >
                           Refresh
                         </button>
                         <button
                           type="button"
                           onClick={openAllNotifications}
-                          className="text-xs font-semibold text-slate-600 hover:text-slate-900"
+                          className="text-xs font-semibold text-teal-300 hover:text-teal-200"
                         >
                           View All
                         </button>
                       </div>
                     </div>
 
-                    {bellLoading ? <p className="px-2 py-4 text-sm text-gray-500">Loading...</p> : null}
-                    {!bellLoading && bellError ? <p className="px-2 py-4 text-sm text-rose-600">{bellError}</p> : null}
-                    {!bellLoading && !bellError && myNotifications.length === 0 ? (
-                      <p className="px-2 py-4 text-sm text-gray-500">No notifications yet.</p>
-                    ) : null}
-
-                    {!bellLoading && !bellError && myNotifications.length > 0 ? (
-                      <div className="max-h-80 space-y-2 overflow-y-auto pr-1">
-                        {myNotifications.slice(0, 10).map((item) => (
-                          <div key={item.id} className={`rounded-xl border p-3 ${item.read ? 'border-gray-100 bg-white' : 'border-teal-200 bg-teal-50/40'}`}>
-                            <div className="flex items-start justify-between gap-3">
-                              <p className="text-sm font-semibold text-gray-800">{item.subject || 'Notification'}</p>
-                              {!item.read ? <span className="rounded-full bg-teal-600 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">Unread</span> : null}
+                    <div className="p-3">
+                      {bellLoading && (
+                        <p className="py-4 text-center text-sm text-slate-500">Loading...</p>
+                      )}
+                      {!bellLoading && bellError && (
+                        <p className="py-4 text-center text-sm text-rose-600">{bellError}</p>
+                      )}
+                      {!bellLoading && !bellError && myNotifications.length === 0 && (
+                        <p className="py-4 text-center text-sm text-slate-500">
+                          No notifications yet.
+                        </p>
+                      )}
+                      {!bellLoading && !bellError && myNotifications.length > 0 && (
+                        <div className="max-h-72 space-y-2 overflow-y-auto pr-0.5">
+                          {myNotifications.slice(0, 10).map((item) => (
+                            <div
+                              key={item.id}
+                              className={`rounded-2xl border p-3 transition ${
+                                item.read
+                                  ? 'border-slate-100 bg-white'
+                                  : 'border-teal-200 bg-teal-50/60'
+                              }`}
+                            >
+                              <div className="flex items-start justify-between gap-2">
+                                <p className="leading-tight text-sm font-semibold text-slate-800">
+                                  {item.subject || 'Notification'}
+                                </p>
+                                {!item.read && (
+                                  <span className="shrink-0 rounded-full bg-teal-600 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-white">
+                                    New
+                                  </span>
+                                )}
+                              </div>
+                              <p className="mt-1 line-clamp-2 text-xs text-slate-500">
+                                {item.message}
+                              </p>
+                              <div className="mt-2 flex items-center justify-between text-[10px] text-slate-400">
+                                <span>{item.channel || 'N/A'}</span>
+                                <span>{item.status || 'N/A'}</span>
+                              </div>
                             </div>
-                            <p className="mt-1 line-clamp-2 text-xs text-gray-600">{item.message}</p>
-                            <div className="mt-2 flex items-center justify-between text-[11px] text-gray-500">
-                              <span>{item.channel || 'N/A'}</span>
-                              <span>{item.status || 'N/A'}</span>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    ) : null}
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </div>
-                ) : null}
+                )}
               </div>
 
               {currentUser ? (
-                <div className="ml-4 flex items-center gap-3">
-                  {isAdmin ? (
+                <>
+                  {isAdmin && (
                     <button
                       type="button"
                       onClick={() => navigate('/admin')}
-                      className="rounded-full border border-teal-200 px-4 py-2 text-sm font-semibold text-teal-700 transition hover:bg-teal-50"
+                      className="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-slate-300 hover:text-slate-900"
                     >
                       Dashboard
                     </button>
-                  ) : null}
+                  )}
                   <button
                     type="button"
                     onClick={() => navigate('/profile')}
-                    className="rounded-full bg-teal-100 px-4 py-2 text-sm font-semibold text-teal-700 transition hover:bg-teal-200"
+                    className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-left transition hover:border-teal-200 hover:bg-teal-50/70"
                   >
-                    Profile
+                    <div className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-900 text-sm font-semibold text-white">
+                      {initials}
+                    </div>
+                    <div className="max-w-[180px]">
+                      <p className="truncate text-sm font-semibold text-slate-900">{displayName}</p>
+                      <p className="truncate text-xs text-slate-500">{currentUser.email}</p>
+                    </div>
                   </button>
-                  <div className="rounded-full bg-slate-100 px-4 py-2 text-sm font-medium text-slate-700">
-                    {currentUser.name || currentUser.email}
-                  </div>
                   <button
                     type="button"
                     onClick={handleLogout}
-                    className="rounded-full bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-700"
+                    className="rounded-2xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800"
                   >
                     Logout
                   </button>
-                </div>
+                </>
               ) : (
-                <div className="ml-4 flex items-center gap-2">
+                <>
                   <button
                     type="button"
                     onClick={() => navigate('/login')}
-                    className="rounded-full border border-teal-200 px-5 py-2 text-sm font-semibold text-teal-700 transition hover:bg-teal-50"
+                    className="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:text-slate-900"
                   >
-                    User Login
+                    Login
                   </button>
                   <button
                     type="button"
                     onClick={() => navigate('/register')}
-                    className="flex items-center gap-2 rounded-full bg-linear-to-r from-teal-600 to-cyan-600 px-5 py-2 text-sm font-semibold text-white shadow-md transition-all hover:scale-105 hover:shadow-lg"
+                    className="flex items-center gap-2 rounded-2xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800"
                   >
-                    <i className="fas fa-user-plus"></i>
-                    User Register
+                    <i className="fas fa-user-plus text-xs"></i>
+                    Register
                   </button>
-                </div>
+                </>
               )}
             </div>
 
-            <div className="md:hidden">
-              <button
-                onClick={() => setIsMenuOpen(!isMenuOpen)}
-                className="rounded-lg p-2 text-gray-600 transition hover:bg-gray-100 focus:outline-none"
-              >
-                <i className={`fas ${isMenuOpen ? 'fa-times' : 'fa-bars'} text-2xl`}></i>
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={() => setIsMenuOpen(!isMenuOpen)}
+              className="flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-700 shadow-sm transition hover:border-slate-300 hover:text-slate-900 lg:hidden"
+            >
+              {isMenuOpen ? <HiXMark className="text-[22px]" /> : <HiBars3 className="text-[22px]" />}
+            </button>
           </div>
+        </div>
 
-          {isMenuOpen && (
-            <div className="border-t border-gray-100 bg-white/95 py-4 backdrop-blur-md md:hidden">
-              <div className="flex flex-col space-y-2 pb-3">
-                {navLinks.map((link) => (
-                  <button
-                    key={link.id}
-                    onClick={() => scrollToSection(link.id)}
-                    className={`flex items-center gap-3 rounded-xl px-4 py-3 text-base font-medium transition ${
-                      activeLink === link.id ? 'bg-teal-50 text-teal-700' : 'text-gray-700 hover:bg-gray-50'
-                    }`}
-                  >
-                    <i className={`${link.icon} w-5`}></i>
-                    {link.label}
-                  </button>
-                ))}
+        {isMenuOpen && (
+          <div className="mx-auto mt-3 max-w-7xl overflow-hidden rounded-[24px] border border-slate-200 bg-white p-4 shadow-[0_24px_70px_-30px_rgba(15,23,42,0.35)] ring-1 ring-slate-100 lg:hidden">
+            <div className="flex flex-col gap-1.5">
+              {navLinks.map((link) => (
+                <button
+                  key={link.id}
+                  type="button"
+                  onClick={() => scrollToSection(link.id)}
+                  className={`flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-medium transition ${
+                    activeLink === link.id
+                      ? 'bg-slate-900 text-white'
+                      : 'text-slate-700 hover:bg-slate-50'
+                  }`}
+                >
+                  <i className={`${link.icon} w-4`}></i>
+                  {link.label}
+                </button>
+              ))}
 
-                <div className="space-y-2 px-4 pt-2">
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      setIsMenuOpen(false);
-                      await openAllNotifications();
-                    }}
-                    className="flex w-full items-center justify-center gap-2 rounded-xl border border-teal-200 py-3 font-semibold text-teal-700"
-                  >
-                    <span aria-hidden="true">🔔</span>
-                    Notifications
-                  </button>
-
-                  {currentUser ? (
-                    <>
-                      {isAdmin ? (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setIsMenuOpen(false);
-                            navigate('/admin');
-                          }}
-                          className="w-full rounded-xl border border-teal-200 py-3 font-semibold text-teal-700"
-                        >
-                          Dashboard
-                        </button>
-                      ) : null}
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setIsMenuOpen(false);
-                          navigate('/profile');
-                        }}
-                        className="w-full rounded-xl bg-teal-100 py-3 font-semibold text-teal-700"
-                      >
-                        Profile
-                      </button>
-                      <div className="rounded-xl bg-slate-100 px-4 py-3 text-sm font-medium text-slate-700">
-                        Signed in as {currentUser.name || currentUser.email}
-                      </div>
-                      <button
-                        type="button"
-                        onClick={handleLogout}
-                        className="w-full rounded-xl border border-slate-200 py-3 font-semibold text-slate-700"
-                      >
-                        Logout
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setIsMenuOpen(false);
-                          navigate('/login');
-                        }}
-                        className="w-full rounded-xl border border-teal-200 py-3 font-semibold text-teal-700"
-                      >
-                        User Login
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setIsMenuOpen(false);
-                          navigate('/register');
-                        }}
-                        className="flex w-full items-center justify-center gap-2 rounded-xl bg-linear-to-r from-teal-600 to-cyan-600 py-3 font-semibold text-white shadow"
-                      >
-                        <i className="fas fa-user-plus"></i>
-                        User Register
-                      </button>
-                    </>
+              <div className="mt-2 flex flex-col gap-2 border-t border-slate-200 pt-4">
+                <button
+                  type="button"
+                  onClick={async () => {
+                    setIsMenuOpen(false);
+                    await openAllNotifications();
+                  }}
+                  className="flex w-full items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 py-3 text-sm font-semibold text-slate-700"
+                >
+                  <HiOutlineBell className="text-[18px]" aria-hidden="true" />
+                  Notifications
+                  {currentUser && unreadNotificationsCount > 0 && (
+                    <span className="ml-1 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-bold text-white">
+                      {unreadNotificationsCount}
+                    </span>
                   )}
-                </div>
+                </button>
+
+                {currentUser ? (
+                  <>
+                    {isAdmin && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsMenuOpen(false);
+                          navigate('/admin');
+                        }}
+                        className="w-full rounded-2xl border border-slate-200 bg-white py-3 text-sm font-semibold text-slate-700"
+                      >
+                        Dashboard
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsMenuOpen(false);
+                        navigate('/profile');
+                      }}
+                      className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-left text-sm text-slate-700"
+                    >
+                      <span className="block font-semibold text-slate-900">{displayName}</span>
+                      <span className="block truncate text-xs text-slate-500">{currentUser.email}</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleLogout}
+                      className="w-full rounded-2xl bg-slate-900 py-3 text-sm font-semibold text-white"
+                    >
+                      Logout
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsMenuOpen(false);
+                        navigate('/login');
+                      }}
+                      className="w-full rounded-2xl border border-slate-200 bg-white py-3 text-sm font-semibold text-slate-700"
+                    >
+                      Login
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsMenuOpen(false);
+                        navigate('/register');
+                      }}
+                      className="flex w-full items-center justify-center gap-2 rounded-2xl bg-slate-900 py-3 text-sm font-semibold text-white shadow-sm"
+                    >
+                      <i className="fas fa-user-plus text-xs"></i>
+                      Register
+                    </button>
+                  </>
+                )}
               </div>
             </div>
-          )}
-        </div>
+          </div>
+        )}
       </nav>
 
-      {showAllNotifications ? (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/55 p-4 backdrop-blur-sm" onClick={() => setShowAllNotifications(false)}>
-          <div className="max-h-[85vh] w-full max-w-4xl overflow-hidden rounded-3xl bg-white shadow-2xl" onClick={(event) => event.stopPropagation()}>
-            <div className="border-b border-gray-100 bg-gradient-to-r from-teal-900 via-teal-800 to-cyan-800 px-6 py-5 text-white">
+      <div className="h-24" />
+
+      {showAllNotifications && (
+        <div
+          className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm"
+          onClick={() => setShowAllNotifications(false)}
+        >
+          <div
+            className="max-h-[88vh] w-full max-w-4xl overflow-hidden rounded-3xl bg-white shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="border-b border-white/10 bg-gradient-to-r from-teal-800 via-teal-700 to-cyan-700 px-6 py-5 text-white">
               <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.25em] text-teal-100">Notification Center</p>
-                  <h3 className="mt-2 text-2xl font-bold">All Notifications</h3>
-                  <p className="mt-1 text-sm text-teal-50/90">See every notification sent to your account and audience.</p>
+                  <p className="text-xs font-semibold uppercase tracking-widest text-teal-200">
+                    Notification Center
+                  </p>
+                  <h3 className="mt-1.5 text-2xl font-bold">All Notifications</h3>
+                  <p className="mt-1 text-sm text-teal-100/80">
+                    Every notification sent to your account and audience.
+                  </p>
                 </div>
                 <div className="flex items-center gap-3">
                   <button
                     type="button"
                     onClick={loadMyNotifications}
-                    className="rounded-full border border-white/20 bg-white/10 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/20"
+                    className="rounded-xl border border-white/20 bg-white/10 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/20"
                   >
                     Refresh
                   </button>
                   <button
                     type="button"
                     onClick={() => setShowAllNotifications(false)}
-                    className="rounded-full border border-white/20 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/10"
+                    className="rounded-xl border border-white/20 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/10"
                   >
                     Close
                   </button>
@@ -473,149 +533,209 @@ const Navbar = ({ navigate, currentUser }) => {
             </div>
 
             <div className="border-b border-gray-100 bg-slate-50 px-6 py-4">
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-5">
-                <div className="rounded-2xl bg-white px-4 py-3 shadow-sm">
-                  <p className="text-xs uppercase tracking-wide text-gray-500">Total</p>
-                  <p className="mt-1 text-2xl font-bold text-gray-800">{myNotifications.length}</p>
-                </div>
-                <div className="rounded-2xl bg-cyan-50 px-4 py-3 shadow-sm">
-                  <p className="text-xs uppercase tracking-wide text-cyan-700">Unread</p>
-                  <p className="mt-1 text-2xl font-bold text-cyan-700">{unreadNotificationsCount}</p>
-                </div>
-                <div className="rounded-2xl bg-amber-50 px-4 py-3 shadow-sm">
-                  <p className="text-xs uppercase tracking-wide text-amber-700">Queued</p>
-                  <p className="mt-1 text-2xl font-bold text-amber-700">{myNotifications.filter((item) => item.status === 'QUEUED').length}</p>
-                </div>
-                <div className="rounded-2xl bg-emerald-50 px-4 py-3 shadow-sm">
-                  <p className="text-xs uppercase tracking-wide text-emerald-700">Sent</p>
-                  <p className="mt-1 text-2xl font-bold text-emerald-700">{myNotifications.filter((item) => item.status === 'SENT').length}</p>
-                </div>
-                <div className="rounded-2xl bg-rose-50 px-4 py-3 shadow-sm">
-                  <p className="text-xs uppercase tracking-wide text-rose-700">Failed</p>
-                  <p className="mt-1 text-2xl font-bold text-rose-700">{myNotifications.filter((item) => item.status === 'FAILED').length}</p>
-                </div>
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+                {[
+                  { label: 'Total', value: myNotifications.length, cls: 'bg-white text-gray-800' },
+                  {
+                    label: 'Unread',
+                    value: unreadNotificationsCount,
+                    cls: 'bg-cyan-50 text-cyan-700',
+                  },
+                  {
+                    label: 'Queued',
+                    value: myNotifications.filter((n) => n.status === 'QUEUED').length,
+                    cls: 'bg-amber-50 text-amber-700',
+                  },
+                  {
+                    label: 'Sent',
+                    value: myNotifications.filter((n) => n.status === 'SENT').length,
+                    cls: 'bg-emerald-50 text-emerald-700',
+                  },
+                  {
+                    label: 'Failed',
+                    value: myNotifications.filter((n) => n.status === 'FAILED').length,
+                    cls: 'bg-rose-50 text-rose-700',
+                  },
+                ].map(({ label, value, cls }) => (
+                  <div key={label} className={`rounded-2xl px-4 py-3 shadow-sm ${cls}`}>
+                    <p className="text-xs font-semibold uppercase tracking-wide opacity-70">
+                      {label}
+                    </p>
+                    <p className="mt-1 text-2xl font-bold">{value}</p>
+                  </div>
+                ))}
               </div>
 
-              <div className="mt-4 flex flex-wrap items-center gap-3">
-                <span className="text-xs font-semibold uppercase tracking-[0.2em] text-gray-500">Status</span>
+              <div className="mt-4 flex flex-wrap items-center gap-2">
+                <span className="text-xs font-semibold uppercase tracking-widest text-gray-400">
+                  Status
+                </span>
                 {readFilters.map((filter) => (
                   <button
                     key={filter}
                     type="button"
                     onClick={() => setSelectedReadFilter(filter)}
-                    className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
+                    className={`rounded-full px-4 py-1.5 text-xs font-semibold transition ${
                       selectedReadFilter === filter
                         ? 'bg-slate-800 text-white shadow-sm'
-                        : 'border border-gray-200 bg-white text-gray-600 hover:border-slate-300 hover:text-slate-900'
+                        : 'border border-gray-200 bg-white text-gray-600 hover:border-slate-300 hover:text-slate-800'
                     }`}
                   >
-                    {formatCategoryLabel(filter)}
-                    <span className="ml-2 text-xs opacity-80">
+                    {formatCategoryLabel(filter)}{' '}
+                    <span className="opacity-60">
                       {filter === 'ALL'
                         ? myNotifications.length
                         : filter === 'UNREAD'
                           ? unreadNotificationsCount
-                          : myNotifications.filter((item) => Boolean(item?.read)).length}
+                          : myNotifications.filter((n) => Boolean(n?.read)).length}
                     </span>
                   </button>
                 ))}
               </div>
 
-              <div className="mt-4 flex flex-wrap items-center gap-3">
-                <span className="text-xs font-semibold uppercase tracking-[0.2em] text-gray-500">Categories</span>
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <span className="text-xs font-semibold uppercase tracking-widest text-gray-400">
+                  Category
+                </span>
                 {notificationCategories.map((category) => (
                   <button
                     key={category}
                     type="button"
                     onClick={() => setSelectedCategory(category)}
-                    className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
+                    className={`rounded-full px-4 py-1.5 text-xs font-semibold transition ${
                       selectedCategory === category
                         ? 'bg-teal-600 text-white shadow-sm'
                         : 'border border-gray-200 bg-white text-gray-600 hover:border-teal-200 hover:text-teal-700'
                     }`}
                   >
-                    {formatCategoryLabel(category)}
-                    <span className="ml-2 text-xs opacity-80">
+                    {formatCategoryLabel(category)}{' '}
+                    <span className="opacity-60">
                       {category === 'ALL'
                         ? filteredByReadStatus.length
-                        : filteredByReadStatus.filter((item) => (item?.relatedService || 'GENERAL').toUpperCase() === category).length}
+                        : filteredByReadStatus.filter(
+                            (n) => (n?.relatedService || 'GENERAL').toUpperCase() === category,
+                          ).length}
                     </span>
                   </button>
                 ))}
               </div>
             </div>
 
-            <div className="max-h-[calc(85vh-220px)] overflow-y-auto px-6 py-5">
-              {bellLoading ? <p className="py-8 text-center text-sm text-gray-500">Loading notifications...</p> : null}
-              {!bellLoading && bellError ? <p className="py-8 text-center text-sm text-rose-600">{bellError}</p> : null}
-              {!bellLoading && !bellError && filteredNotifications.length === 0 ? (
+            <div className="max-h-[calc(88vh-260px)] overflow-y-auto px-6 py-5">
+              {bellLoading && (
+                <p className="py-8 text-center text-sm text-gray-400">Loading notifications...</p>
+              )}
+              {!bellLoading && bellError && (
+                <p className="py-8 text-center text-sm text-rose-600">{bellError}</p>
+              )}
+              {!bellLoading && !bellError && filteredNotifications.length === 0 && (
                 <div className="rounded-2xl border border-dashed border-gray-200 bg-slate-50 px-6 py-12 text-center">
-                  <p className="text-lg font-semibold text-gray-700">
-                    {myNotifications.length === 0 ? 'No notifications yet' : 'No notifications in this category'}
-                  </p>
-                  <p className="mt-2 text-sm text-gray-500">
+                  <p className="text-base font-semibold text-gray-600">
                     {myNotifications.length === 0
-                      ? 'When appointments, updates, or admin messages arrive, they will appear here.'
-                      : 'Try another category to see more notifications.'}
+                      ? 'No notifications yet'
+                      : 'No notifications in this category'}
+                  </p>
+                  <p className="mt-2 text-sm text-gray-400">
+                    {myNotifications.length === 0
+                      ? 'Appointments, updates, and messages will appear here.'
+                      : 'Try another category to see more.'}
                   </p>
                 </div>
-              ) : null}
+              )}
 
-              {!bellLoading && !bellError && filteredNotifications.length > 0 ? (
-                <div className="space-y-4">
+              {!bellLoading && !bellError && filteredNotifications.length > 0 && (
+                <div className="space-y-3">
                   {filteredNotifications.map((item) => (
-                    <article key={item.id} className={`rounded-2xl border p-5 shadow-sm transition hover:shadow-md ${item.read ? 'border-gray-100 bg-white' : 'border-teal-200 bg-teal-50/30'}`}>
+                    <article
+                      key={item.id}
+                      className={`rounded-2xl border p-5 transition hover:shadow-md ${
+                        item.read ? 'border-gray-100 bg-white' : 'border-teal-200 bg-teal-50/40'
+                      }`}
+                    >
                       <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                         <div className="min-w-0 flex-1">
                           <div className="flex flex-wrap items-center gap-2">
-                            <h4 className="text-lg font-bold text-gray-800">{item.subject || 'Notification'}</h4>
-                            <span className={`rounded-full px-3 py-1 text-xs font-semibold ${getNotificationBadgeClass(item.status)}`}>
+                            <h4 className="text-base font-bold text-gray-800">
+                              {item.subject || 'Notification'}
+                            </h4>
+                            <span
+                              className={`rounded-full px-3 py-0.5 text-xs font-semibold ${getNotificationBadgeClass(item.status)}`}
+                            >
                               {item.status || 'QUEUED'}
                             </span>
-                            <span className={`rounded-full px-3 py-1 text-xs font-semibold ${item.read ? 'bg-slate-200 text-slate-700' : 'bg-teal-600 text-white'}`}>
+                            <span
+                              className={`rounded-full px-3 py-0.5 text-xs font-semibold ${
+                                item.read
+                                  ? 'bg-slate-100 text-slate-600'
+                                  : 'bg-teal-600 text-white'
+                              }`}
+                            >
                               {item.read ? 'Read' : 'Unread'}
                             </span>
                           </div>
-                          <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-gray-600">{item.message || 'No message available.'}</p>
-                          <div className="mt-4 flex flex-wrap gap-3">
+                          <p className="mt-2.5 whitespace-pre-wrap text-sm leading-relaxed text-gray-600">
+                            {item.message || 'No message available.'}
+                          </p>
+                          <div className="mt-3">
                             <button
                               type="button"
                               onClick={() => toggleNotificationReadState(item.id, !item.read)}
                               disabled={updatingReadId === item.id}
-                              className={`rounded-full px-4 py-2 text-xs font-semibold transition disabled:opacity-50 ${item.read ? 'bg-slate-900 text-white hover:bg-slate-700' : 'bg-teal-600 text-white hover:bg-teal-700'}`}
+                              className={`rounded-xl px-4 py-2 text-xs font-semibold transition disabled:opacity-50 ${
+                                item.read
+                                  ? 'bg-slate-800 text-white hover:bg-slate-700'
+                                  : 'bg-teal-600 text-white hover:bg-teal-700'
+                              }`}
                             >
-                              {updatingReadId === item.id ? 'Updating...' : item.read ? 'Mark as Unread' : 'Mark as Read'}
+                              {updatingReadId === item.id
+                                ? 'Updating...'
+                                : item.read
+                                  ? 'Mark as Unread'
+                                  : 'Mark as Read'}
                             </button>
                           </div>
                         </div>
 
-                        <div className="grid min-w-[220px] grid-cols-2 gap-3 md:grid-cols-1">
-                          <div className="rounded-xl bg-slate-50 px-4 py-3">
-                            <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">Channel</p>
-                            <p className="mt-1 text-sm font-semibold text-teal-700">{item.channel || 'N/A'}</p>
-                          </div>
-                          <div className="rounded-xl bg-slate-50 px-4 py-3">
-                            <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">Received</p>
-                            <p className="mt-1 text-sm font-semibold text-gray-700">{formatNotificationDate(item.createdAt || item.sentAt)}</p>
-                          </div>
-                          <div className="rounded-xl bg-slate-50 px-4 py-3">
-                            <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">Audience</p>
-                            <p className="mt-1 text-sm font-semibold text-gray-700">{item.audienceType || 'GENERAL'}</p>
-                          </div>
-                          <div className="rounded-xl bg-slate-50 px-4 py-3">
-                            <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">Service</p>
-                            <p className="mt-1 text-sm font-semibold text-gray-700">{item.relatedService || 'GENERAL'}</p>
-                          </div>
+                        <div className="grid min-w-[200px] grid-cols-2 gap-2 md:grid-cols-1">
+                          {[
+                            {
+                              label: 'Channel',
+                              value: item.channel || 'N/A',
+                              color: 'text-teal-700',
+                            },
+                            {
+                              label: 'Received',
+                              value: formatNotificationDate(item.createdAt || item.sentAt),
+                              color: 'text-gray-700',
+                            },
+                            {
+                              label: 'Audience',
+                              value: item.audienceType || 'GENERAL',
+                              color: 'text-gray-700',
+                            },
+                            {
+                              label: 'Service',
+                              value: item.relatedService || 'GENERAL',
+                              color: 'text-gray-700',
+                            },
+                          ].map(({ label, value, color }) => (
+                            <div key={label} className="rounded-xl bg-slate-50 px-3 py-2.5">
+                              <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">
+                                {label}
+                              </p>
+                              <p className={`mt-0.5 text-xs font-semibold ${color}`}>{value}</p>
+                            </div>
+                          ))}
                         </div>
                       </div>
                     </article>
                   ))}
                 </div>
-              ) : null}
+              )}
             </div>
           </div>
         </div>
-      ) : null}
+      )}
     </>
   );
 };
