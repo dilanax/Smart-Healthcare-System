@@ -1,16 +1,36 @@
-$jobs = @()
+$ErrorActionPreference = 'Stop'
 
-$jobs += Start-Job -ScriptBlock { kubectl -n smart-healthcare port-forward svc/frontend 5173:5173 }
-$jobs += Start-Job -ScriptBlock { kubectl -n smart-healthcare port-forward svc/auth-service 8081:8081 }
-$jobs += Start-Job -ScriptBlock { kubectl -n smart-healthcare port-forward svc/doctor-service 8082:8082 }
-$jobs += Start-Job -ScriptBlock { kubectl -n smart-healthcare port-forward svc/patient-service 8083:8083 }
-$jobs += Start-Job -ScriptBlock { kubectl -n smart-healthcare port-forward svc/notification-service 8084:8084 }
-$jobs += Start-Job -ScriptBlock { kubectl -n smart-healthcare port-forward svc/appointment-service 8085:8085 }
-$jobs += Start-Job -ScriptBlock { kubectl -n smart-healthcare port-forward svc/payment-service 8086:8086 }
+$root = Split-Path -Parent $PSScriptRoot
+$logDir = Join-Path $PSScriptRoot 'logs'
 
-Write-Host "Port forwarding started in background jobs."
-Write-Host "Frontend: http://localhost:5173"
-Write-Host "APIs: localhost:8081..8086"
-Write-Host "Run 'Get-Job' to see job status."
-Write-Host "Run 'Stop-Job *; Remove-Job *' to stop all forwards."
+if (-not (Test-Path $logDir)) {
+    New-Item -ItemType Directory -Path $logDir | Out-Null
+}
 
+$forwards = @(
+    @{ Name = 'frontend'; Port = 5173 },
+    @{ Name = 'auth-service'; Port = 8081 },
+    @{ Name = 'doctor-service'; Port = 8082 },
+    @{ Name = 'patient-service'; Port = 8083 },
+    @{ Name = 'notification-service'; Port = 8084 },
+    @{ Name = 'appointment-service'; Port = 8085 },
+    @{ Name = 'payment-service'; Port = 8086 }
+)
+
+foreach ($forward in $forwards) {
+    $service = $forward.Name
+    $port = $forward.Port
+    $logFile = Join-Path $logDir "$service-port-forward.log"
+    $command = "kubectl -n smart-healthcare port-forward svc/$service ${port}:${port}"
+
+    Start-Process powershell -ArgumentList @(
+        '-NoProfile',
+        '-WindowStyle', 'Minimized',
+        '-Command', "$command *> '$logFile'"
+    ) -WorkingDirectory $root | Out-Null
+}
+
+Write-Host 'Port forwarding started in separate PowerShell processes.'
+Write-Host 'Frontend: http://localhost:5173'
+Write-Host 'APIs: localhost:8081..8086'
+Write-Host "Logs: $logDir"

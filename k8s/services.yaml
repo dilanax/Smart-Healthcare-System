@@ -13,6 +13,10 @@ spec:
       labels:
         app: auth-service
     spec:
+      initContainers:
+        - name: wait-for-mysql
+          image: busybox:1.36
+          command: ['sh', '-c', 'until nc -z mysql 3306; do echo waiting for mysql; sleep 2; done']
       containers:
         - name: auth-service
           image: smart-healthcare/auth-service:latest
@@ -87,6 +91,10 @@ spec:
       labels:
         app: doctor-service
     spec:
+      initContainers:
+        - name: wait-for-mysql
+          image: busybox:1.36
+          command: ['sh', '-c', 'until nc -z mysql 3306; do echo waiting for mysql; sleep 2; done']
       containers:
         - name: doctor-service
           image: smart-healthcare/doctor-service:latest
@@ -136,6 +144,10 @@ spec:
       labels:
         app: patient-service
     spec:
+      initContainers:
+        - name: wait-for-mysql
+          image: busybox:1.36
+          command: ['sh', '-c', 'until nc -z mysql 3306; do echo waiting for mysql; sleep 2; done']
       containers:
         - name: patient-service
           image: smart-healthcare/patient-service:latest
@@ -185,6 +197,10 @@ spec:
       labels:
         app: notification-service
     spec:
+      initContainers:
+        - name: wait-for-mysql
+          image: busybox:1.36
+          command: ['sh', '-c', 'until nc -z mysql 3306; do echo waiting for mysql; sleep 2; done']
       containers:
         - name: notification-service
           image: smart-healthcare/notification-service:latest
@@ -252,6 +268,10 @@ spec:
       labels:
         app: appointment-service
     spec:
+      initContainers:
+        - name: wait-for-mysql
+          image: busybox:1.36
+          command: ['sh', '-c', 'until nc -z mysql 3306; do echo waiting for mysql; sleep 2; done']
       containers:
         - name: appointment-service
           image: smart-healthcare/appointment-service:latest
@@ -301,6 +321,10 @@ spec:
       labels:
         app: payment-service
     spec:
+      initContainers:
+        - name: wait-for-mysql
+          image: busybox:1.36
+          command: ['sh', '-c', 'until nc -z mysql 3306; do echo waiting for mysql; sleep 2; done']
       containers:
         - name: payment-service
           image: smart-healthcare/payment-service:latest
