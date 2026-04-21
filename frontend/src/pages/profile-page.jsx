@@ -3,6 +3,8 @@ import { fetchUserById, getStoredUser, storeUser, updateUser } from '../lib/auth
 import Navbar from '../components/navbar';
 
 const STORAGE_KEY_PRESCRIPTIONS = 'doctor_prescriptions';
+const PROFILE_PICTURE_STORAGE_PREFIX = 'patient_profile_picture_';
+const PROFILE_DETAILS_STORAGE_PREFIX = 'patient_profile_details_';
 
 const buildJitsiCallUrl = (roomName, displayName) =>
   `https://meet.jit.si/${encodeURIComponent(roomName)}#userInfo.displayName=${encodeURIComponent(displayName)}&config.startWithVideoMuted=false&config.startWithAudioMuted=false&config.prejoinPageEnabled=false`;
@@ -93,6 +95,51 @@ const revokeBlobUrl = (url) => {
   if (typeof url === 'string' && url.startsWith('blob:')) {
     URL.revokeObjectURL(url);
   }
+};
+
+const readFileAsDataUrl = (file) =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(new Error('Failed to read selected image.'));
+    reader.readAsDataURL(file);
+  });
+
+const getProfilePictureStorageKey = (userId) => `${PROFILE_PICTURE_STORAGE_PREFIX}${userId}`;
+
+const loadStoredProfilePicture = (userId) => {
+  if (!userId) return '';
+  try {
+    return localStorage.getItem(getProfilePictureStorageKey(userId)) || '';
+  } catch {
+    return '';
+  }
+};
+
+const saveStoredProfilePicture = (userId, dataUrl) => {
+  if (!userId || !dataUrl) return;
+  try {
+    localStorage.setItem(getProfilePictureStorageKey(userId), dataUrl);
+  } catch {
+    throw new Error('Image is too large to store. Please choose a smaller photo.');
+  }
+};
+
+const getProfileDetailsStorageKey = (userId) => `${PROFILE_DETAILS_STORAGE_PREFIX}${userId}`;
+
+const loadStoredProfileDetails = (userId) => {
+  if (!userId) return {};
+  try {
+    const raw = localStorage.getItem(getProfileDetailsStorageKey(userId));
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+};
+
+const saveStoredProfileDetails = (userId, details) => {
+  if (!userId || !details) return;
+  localStorage.setItem(getProfileDetailsStorageKey(userId), JSON.stringify(details));
 };
 
 const NOTICE_STYLES = {
@@ -273,7 +320,7 @@ const InputField = ({ label, type = 'text', value, onChange }) => (
   </div>
 );
 
-const ProfilePage = ({ navigate, currentUser }) => {
+const ProfilePage = ({ navigate, currentUser, refreshUser }) => {
   const [userDetails, setUserDetails] = useState(null);
   const [appointments, setAppointments] = useState([]);
   const [prescriptions, setPrescriptions] = useState([]);
@@ -295,13 +342,27 @@ const ProfilePage = ({ navigate, currentUser }) => {
   });
 
   const avatarUploadRef = useRef(null);
+  const storedAuthUser = getStoredUser();
 
   const getAccessToken = () => {
-    const candidate = currentUser?.accessToken || currentUser?.token || localStorage.getItem('healthcare_auth_token') || '';
+    const candidate =
+      currentUser?.accessToken ||
+      currentUser?.token ||
+      storedAuthUser?.accessToken ||
+      storedAuthUser?.token ||
+      localStorage.getItem('healthcare_auth_token') ||
+      '';
     return typeof candidate === 'string' ? candidate.replace(/^["']|["']$/g, '') : '';
   };
 
-  const getCurrentUserId = () => currentUser?.userId ?? currentUser?.id ?? userDetails?.userId ?? userDetails?.id ?? null;
+  const getCurrentUserId = () =>
+    currentUser?.userId ??
+    currentUser?.id ??
+    storedAuthUser?.userId ??
+    storedAuthUser?.id ??
+    userDetails?.userId ??
+    userDetails?.id ??
+    null;
 
   const getAppointmentId = (appointment) => appointment?.appointmentId ?? appointment?.id;
   const canJoinTelemedicine = (appointment) => String(appointment?.status || '').toUpperCase() === 'CONFIRMED';
@@ -350,29 +411,24 @@ const ProfilePage = ({ navigate, currentUser }) => {
 
         const token = getAccessToken();
         const actualUserId = getCurrentUserId();
+        const storedProfileDetails = loadStoredProfileDetails(actualUserId);
 
-        try {
-          const picRes = await fetch(`http://localhost:8083/api/patients/profile/${actualUserId}/picture`, {
-            method: 'GET',
-            headers: { Authorization: `Bearer ${token}` },
-          });
-
-          if (picRes.ok) {
-            const blob = await picRes.blob();
-            if (blob.size > 0) {
-              updateProfilePicUrl(URL.createObjectURL(blob));
-            }
-          }
-        } catch {
-          console.warn('Could not fetch profile picture.');
+        const storedPicture = loadStoredProfilePicture(actualUserId);
+        if (storedPicture) {
+          updateProfilePicUrl(storedPicture);
         }
 
         try {
           const userData = await fetchUserById(token, actualUserId);
-          setUserDetails(normalizeUserDetails(userData?.data || userData, currentUser));
+          setUserDetails(
+            normalizeUserDetails(
+              { ...(userData?.data || userData || {}), ...storedProfileDetails },
+              currentUser || storedAuthUser || {},
+            ),
+          );
         } catch {
           console.warn('Auth Service offline.');
-          setUserDetails(normalizeUserDetails({}, currentUser));
+          setUserDetails(normalizeUserDetails(storedProfileDetails, currentUser || storedAuthUser || {}));
           showNotice('info', 'Profile details could not be fully loaded, so fallback account data is being shown.');
         }
 
@@ -420,39 +476,32 @@ const ProfilePage = ({ navigate, currentUser }) => {
   const handleProfilePicUpload = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
-    updateProfilePicUrl(URL.createObjectURL(file));
-    setAvatarNotice({ type: 'info', message: 'Uploading your new profile picture...' });
-
-    const token = getAccessToken();
     const actualUserId = getCurrentUserId();
-    const formData = new FormData();
-    formData.append('file', file);
 
-    if (!token || !actualUserId) {
-      showNotice('error', 'Your session is missing. Please log in again.');
-      setAvatarNotice({ type: 'error', message: 'Upload failed. Please log in again.' });
+    if (!actualUserId) {
+      showNotice('error', 'Your profile could not be identified. Please refresh and try again.');
+      setAvatarNotice({ type: 'error', message: 'Upload failed. Please refresh and try again.' });
       return;
     }
 
     try {
-      const res = await fetch(`http://localhost:8083/api/patients/profile/${actualUserId}/picture`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
-        body: formData,
-      });
-
-      if (res.ok) {
-        showNotice('success', 'Profile picture updated!');
-        setAvatarNotice({ type: 'success', message: 'Profile picture updated successfully.' });
-      } else {
-        const message = await readResponseMessage(res, 'Failed to save profile picture.');
-        showNotice('error', message);
-        setAvatarNotice({ type: 'error', message });
+      if (!file.type.startsWith('image/')) {
+        throw new Error('Please choose an image file.');
       }
-    } catch {
-      showNotice('error', 'Network error.');
-      setAvatarNotice({ type: 'error', message: 'Network error while uploading picture.' });
+
+      if (file.size > 2 * 1024 * 1024) {
+        throw new Error('Please choose an image smaller than 2 MB.');
+      }
+
+      setAvatarNotice({ type: 'info', message: 'Saving your new profile picture...' });
+      const dataUrl = await readFileAsDataUrl(file);
+      saveStoredProfilePicture(actualUserId, dataUrl);
+      updateProfilePicUrl(dataUrl);
+      setAvatarNotice({ type: 'success', message: 'Profile picture updated successfully.' });
+      showNotice('success', 'Profile picture updated!');
+    } catch (uploadError) {
+      showNotice('error', uploadError.message || 'Profile picture upload failed.');
+      setAvatarNotice({ type: 'error', message: uploadError.message || 'Profile picture upload failed.' });
     } finally {
       e.target.value = '';
     }
@@ -479,8 +528,8 @@ const ProfilePage = ({ navigate, currentUser }) => {
       return;
     }
 
-    if (!token || !actualUserId) {
-      showNotice('error', 'Your session is missing. Please log in again.');
+    if (!actualUserId) {
+      showNotice('error', 'Your profile could not be identified. Please refresh and try again.');
       return;
     }
 
@@ -489,29 +538,103 @@ const ProfilePage = ({ navigate, currentUser }) => {
       return;
     }
 
+    const localMergedUserDetails = normalizeUserDetails(cleanPayload, {
+      ...(storedAuthUser || {}),
+      ...currentUser,
+      ...userDetails,
+      ...cleanPayload,
+      name: `${cleanPayload.firstName} ${cleanPayload.lastName}`.trim(),
+    });
+
+    if (!token) {
+      saveStoredProfileDetails(actualUserId, cleanPayload);
+      setUserDetails(localMergedUserDetails);
+      setEditForm(buildEditForm(localMergedUserDetails, localMergedUserDetails));
+      storeUser({
+        ...(storedAuthUser || {}),
+        ...currentUser,
+        ...localMergedUserDetails,
+        userId: actualUserId,
+        id: actualUserId,
+        role: currentUser?.role || storedAuthUser?.role || localMergedUserDetails.role || 'PATIENT',
+        email: localMergedUserDetails.email || currentUser?.email || storedAuthUser?.email || '',
+        name: `${localMergedUserDetails.firstName} ${localMergedUserDetails.lastName}`.trim(),
+      });
+      refreshUser?.();
+      showNotice('success', 'Profile updated locally. It will stay saved in this browser.');
+      setIsEditing(false);
+      return;
+    }
+
     try {
       const updatedResponse = await updateUser(token, actualUserId, cleanPayload);
       const mergedUserDetails = normalizeUserDetails(updatedResponse?.data || cleanPayload, {
+        ...(storedAuthUser || {}),
         ...currentUser,
         ...userDetails,
         ...cleanPayload,
         name: `${cleanPayload.firstName} ${cleanPayload.lastName}`.trim(),
       });
 
-      setUserDetails(mergedUserDetails);
-      setEditForm(buildEditForm(mergedUserDetails, mergedUserDetails));
-      storeUser({
-        ...(getStoredUser() || {}),
+      const nextStoredUser = {
+        ...(storedAuthUser || {}),
         ...currentUser,
         ...mergedUserDetails,
-        accessToken: currentUser?.accessToken || currentUser?.token || token,
+        accessToken:
+          currentUser?.accessToken ||
+          currentUser?.token ||
+          storedAuthUser?.accessToken ||
+          storedAuthUser?.token ||
+          token,
+        token:
+          currentUser?.token ||
+          currentUser?.accessToken ||
+          storedAuthUser?.token ||
+          storedAuthUser?.accessToken ||
+          token,
         userId: actualUserId,
+        id: actualUserId,
+        role: currentUser?.role || storedAuthUser?.role || mergedUserDetails.role || 'PATIENT',
+        email: mergedUserDetails.email || currentUser?.email || storedAuthUser?.email || '',
         name: `${mergedUserDetails.firstName} ${mergedUserDetails.lastName}`.trim(),
-      });
+      };
+
+      saveStoredProfileDetails(actualUserId, cleanPayload);
+      setUserDetails(mergedUserDetails);
+      setEditForm(buildEditForm(mergedUserDetails, mergedUserDetails));
+      storeUser(nextStoredUser);
+      refreshUser?.();
       showNotice('success', 'Profile updated!');
       setIsEditing(false);
     } catch (updateError) {
-      showNotice('error', updateError.message || 'Failed to update profile.');
+      saveStoredProfileDetails(actualUserId, cleanPayload);
+      setUserDetails(localMergedUserDetails);
+      setEditForm(buildEditForm(localMergedUserDetails, localMergedUserDetails));
+      storeUser({
+        ...(storedAuthUser || {}),
+        ...currentUser,
+        ...localMergedUserDetails,
+        accessToken:
+          currentUser?.accessToken ||
+          currentUser?.token ||
+          storedAuthUser?.accessToken ||
+          storedAuthUser?.token ||
+          '',
+        token:
+          currentUser?.token ||
+          currentUser?.accessToken ||
+          storedAuthUser?.token ||
+          storedAuthUser?.accessToken ||
+          '',
+        userId: actualUserId,
+        id: actualUserId,
+        role: currentUser?.role || storedAuthUser?.role || localMergedUserDetails.role || 'PATIENT',
+        email: localMergedUserDetails.email || currentUser?.email || storedAuthUser?.email || '',
+        name: `${localMergedUserDetails.firstName} ${localMergedUserDetails.lastName}`.trim(),
+      });
+      refreshUser?.();
+      showNotice('info', 'Profile saved locally because the server session is unavailable right now.');
+      setIsEditing(false);
     }
   };
 
