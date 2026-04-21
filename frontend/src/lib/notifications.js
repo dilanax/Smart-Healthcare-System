@@ -57,6 +57,12 @@ export const fetchNotifications = () => notificationRequest('/api/notifications'
 
 export const fetchNotificationSummary = () => notificationRequest('/api/notifications/summary');
 
+export const createNotification = (payload) =>
+  notificationRequest('/api/notifications', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+
 export const sendAppointmentSuccessNotification = (payload) =>
   notificationRequest('/api/notifications/events/appointment-success', {
     method: 'POST',
@@ -70,6 +76,12 @@ export const updateNotificationStatus = (notificationId, status) =>
   notificationRequest(`/api/notifications/${notificationId}/status`, {
     method: 'PATCH',
     body: JSON.stringify({ status }),
+  });
+
+export const updateNotificationReadStatus = (notificationId, read) =>
+  notificationRequest(`/api/notifications/${notificationId}/read-status`, {
+    method: 'PATCH',
+    body: JSON.stringify({ read }),
   });
 
 export const deleteNotificationById = (notificationId) =>

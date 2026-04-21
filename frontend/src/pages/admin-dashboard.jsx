@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { deleteUser, fetchUserById, fetchUsers, registerUser, updateUser } from '../lib/auth';
-import { deleteNotificationById, fetchNotificationSummary, fetchNotifications, sendNotificationById, updateNotificationStatus } from '../lib/notifications';
+import { createNotification, deleteNotificationById, fetchNotificationSummary, fetchNotifications, sendNotificationById, updateNotificationStatus } from '../lib/notifications';
 import { createDoctorProfile, deleteDoctorProfile, fetchDoctorProfiles, updateDoctorProfile } from '../lib/doctors';
 import { uploadDoctorImage } from '../lib/supabase';
 
@@ -30,6 +30,13 @@ const appointmentStatusClass = (status) => {
   if (status === 'CONFIRMED') return 'bg-green-100 text-green-700';
   if (status === 'CANCELLED') return 'bg-red-100 text-red-700';
   if (status === 'COMPLETED') return 'bg-blue-100 text-blue-700';
+  return 'bg-yellow-100 text-yellow-700';
+};
+
+const notificationStatusClass = (status) => {
+  if (status === 'SENT') return 'bg-green-100 text-green-700';
+  if (status === 'FAILED') return 'bg-rose-100 text-rose-700';
+  if (status === 'CANCELLED') return 'bg-slate-200 text-slate-700';
   return 'bg-yellow-100 text-yellow-700';
 };
 
@@ -90,6 +97,25 @@ const emptyDoctorProfileForm = {
   patientCount: '0',
 };
 
+const emptyNotificationForm = {
+  recipientName: '',
+  recipientEmail: '',
+  recipientPhone: '',
+  audienceType: 'PATIENT',
+  relatedService: 'GENERAL',
+  subject: '',
+  message: '',
+  templateCode: 'ADMIN_GENERAL',
+  channel: 'EMAIL',
+  priority: 'NORMAL',
+  status: 'QUEUED',
+  scheduledAt: '',
+};
+
+const notificationChannels = ['EMAIL', 'SMS', 'PUSH', 'IN_APP'];
+const notificationPriorities = ['LOW', 'NORMAL', 'HIGH', 'CRITICAL'];
+const notificationStatuses = ['QUEUED', 'FAILED', 'CANCELLED'];
+
 const toDoctorProfileForm = (doctor) => ({
   firstName: doctor?.firstName ?? '',
   lastName: doctor?.lastName ?? '',
@@ -134,6 +160,8 @@ const AdminDashboard = ({ navigate, currentUser, refreshUser }) => {
   const [payments, setPayments] = useState([]);
   const [notifications, setNotifications] = useState([]);
   const [notificationSummary, setNotificationSummary] = useState(null);
+  const [notificationForm, setNotificationForm] = useState(emptyNotificationForm);
+  const [notificationFormError, setNotificationFormError] = useState('');
   const [doctorProfiles, setDoctorProfiles] = useState([]);
   const [doctorProfileForm, setDoctorProfileForm] = useState(emptyDoctorProfileForm);
   const [doctorProfileError, setDoctorProfileError] = useState('');
@@ -477,6 +505,76 @@ const approvePayment = async (paymentId) => {
       if (!silent) setLoading(false);
     }
   }, []);
+
+  const handleNotificationFormChange = (event) => {
+    const { name, value } = event.target;
+    setNotificationFormError('');
+    setNotificationForm((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const submitCreateNotification = async (event) => {
+    event.preventDefault();
+    setBusyId('notification-create');
+    setError('');
+    setSuccess('');
+    setNotificationFormError('');
+
+    const payload = {
+      recipientName: notificationForm.recipientName.trim(),
+      recipientEmail: notificationForm.recipientEmail.trim().toLowerCase(),
+      recipientPhone: notificationForm.recipientPhone.trim(),
+      audienceType: notificationForm.audienceType.trim().toUpperCase(),
+      relatedService: notificationForm.relatedService.trim().toUpperCase(),
+      subject: notificationForm.subject.trim(),
+      message: notificationForm.message.trim(),
+      templateCode: notificationForm.templateCode.trim().toUpperCase(),
+      channel: notificationForm.channel,
+      priority: notificationForm.priority,
+      status: notificationForm.status,
+      scheduledAt: notificationForm.scheduledAt || null,
+    };
+
+    if (!payload.recipientName || !payload.subject || !payload.message || !payload.templateCode) {
+      const message = 'Recipient, subject, message, and template code are required.';
+      setNotificationFormError(message);
+      setError(message);
+      setBusyId(null);
+      return;
+    }
+
+    if (payload.channel === 'EMAIL' && !payload.recipientEmail) {
+      const message = 'Recipient email is required for email notifications.';
+      setNotificationFormError(message);
+      setError(message);
+      setBusyId(null);
+      return;
+    }
+
+    if (payload.channel === 'SMS' && !payload.recipientPhone) {
+      const message = 'Recipient phone is required for SMS notifications.';
+      setNotificationFormError(message);
+      setError(message);
+      setBusyId(null);
+      return;
+    }
+
+    try {
+      const response = await createNotification({
+        ...payload,
+        recipientEmail: payload.recipientEmail || null,
+        recipientPhone: payload.recipientPhone || null,
+      });
+      setNotificationForm(emptyNotificationForm);
+      setSuccess(response?.message || 'Notification created successfully.');
+      await loadNotifications(true);
+    } catch (err) {
+      const message = err.message || 'Failed to create notification.';
+      setNotificationFormError(message);
+      setError(message);
+    } finally {
+      setBusyId(null);
+    }
+  };
 
   const triggerSendNotification = async (notificationId) => {
     setBusyId(notificationId);
@@ -1330,98 +1428,213 @@ const handleLogout = () => {
            ) : null}
 
             {!loading && activeTab === 'notifications' ? (
-              <div className="rounded-2xl bg-white shadow-lg">
-                <div className="flex flex-col gap-4 border-b border-gray-200 px-6 py-4 md:flex-row md:items-center md:justify-between">
-                  <div>
-                    <h3 className="text-lg font-bold text-gray-800">Notification Management</h3>
-                    <p className="mt-1 text-sm text-gray-500">Only admins can manage notification delivery and status updates.</p>
+              <div className="space-y-6">
+                <div className="overflow-hidden rounded-2xl bg-white shadow-lg">
+                  <div className="border-b border-gray-200 bg-gradient-to-r from-teal-900 via-teal-800 to-cyan-800 px-6 py-5 text-white">
+                    <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                      <div>
+                        <p className="text-xs font-semibold uppercase tracking-[0.3em] text-teal-100">Admin Control Center</p>
+                        <h3 className="mt-2 text-2xl font-bold">Create and manage notifications</h3>
+                        <p className="mt-2 max-w-2xl text-sm text-teal-50/90">
+                          Compose a notification, choose the delivery channel, and keep the delivery queue organized from one place.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => loadNotifications()}
+                        className="rounded-lg border border-white/20 bg-white/10 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/20"
+                      >
+                        Refresh Notifications
+                      </button>
+                    </div>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => loadNotifications()}
-                    className="rounded-lg bg-teal-600 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-700"
-                  >
-                    Refresh Notifications
-                  </button>
+
+                  <form onSubmit={submitCreateNotification} className="grid grid-cols-1 gap-6 p-6 xl:grid-cols-[1.7fr_1fr]">
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h4 className="text-lg font-bold text-gray-800">New Notification</h4>
+                          <p className="mt-1 text-sm text-gray-500">Fill in the details below to queue a new admin-created notification.</p>
+                        </div>
+                        <span className="rounded-full bg-teal-50 px-3 py-1 text-xs font-semibold text-teal-700">
+                          {notificationForm.channel} · {notificationForm.priority}
+                        </span>
+                      </div>
+
+                      {notificationFormError ? (
+                        <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{notificationFormError}</div>
+                      ) : null}
+
+                      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                        <input name="recipientName" value={notificationForm.recipientName} onChange={handleNotificationFormChange} placeholder="Recipient name" className="rounded-xl border border-gray-200 px-4 py-3 outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-100" />
+                        <input name="subject" value={notificationForm.subject} onChange={handleNotificationFormChange} placeholder="Subject" className="rounded-xl border border-gray-200 px-4 py-3 outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-100" />
+                        <input name="recipientEmail" type="email" value={notificationForm.recipientEmail} onChange={handleNotificationFormChange} placeholder="Recipient email" className="rounded-xl border border-gray-200 px-4 py-3 outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-100" />
+                        <input name="recipientPhone" value={notificationForm.recipientPhone} onChange={handleNotificationFormChange} placeholder="Recipient phone" className="rounded-xl border border-gray-200 px-4 py-3 outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-100" />
+                        <input name="audienceType" value={notificationForm.audienceType} onChange={handleNotificationFormChange} placeholder="Audience type" className="rounded-xl border border-gray-200 px-4 py-3 outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-100" />
+                        <input name="relatedService" value={notificationForm.relatedService} onChange={handleNotificationFormChange} placeholder="Related service" className="rounded-xl border border-gray-200 px-4 py-3 outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-100" />
+                        <input name="templateCode" value={notificationForm.templateCode} onChange={handleNotificationFormChange} placeholder="Template code" className="rounded-xl border border-gray-200 px-4 py-3 outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-100" />
+                        <input name="scheduledAt" type="datetime-local" value={notificationForm.scheduledAt} onChange={handleNotificationFormChange} className="rounded-xl border border-gray-200 px-4 py-3 outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-100" />
+                      </div>
+
+                      <textarea
+                        name="message"
+                        value={notificationForm.message}
+                        onChange={handleNotificationFormChange}
+                        placeholder="Write the notification message"
+                        rows="6"
+                        className="w-full rounded-xl border border-gray-200 px-4 py-3 outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-100"
+                      />
+
+                      <div className="flex flex-wrap justify-end gap-3">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setNotificationForm(emptyNotificationForm);
+                            setNotificationFormError('');
+                          }}
+                          className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-50"
+                        >
+                          Clear
+                        </button>
+                        <button
+                          type="submit"
+                          disabled={busyId === 'notification-create'}
+                          className="rounded-lg bg-teal-600 px-5 py-2 text-sm font-semibold text-white hover:bg-teal-700 disabled:opacity-50"
+                        >
+                          {busyId === 'notification-create' ? 'Creating...' : 'Create Notification'}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="space-y-4">
+                      <div className="rounded-2xl border border-teal-100 bg-teal-50/70 p-5">
+                        <h4 className="text-sm font-bold uppercase tracking-[0.2em] text-teal-800">Delivery Settings</h4>
+                        <div className="mt-4 grid grid-cols-1 gap-4">
+                          <label className="text-sm font-medium text-gray-700">
+                            Channel
+                            <select name="channel" value={notificationForm.channel} onChange={handleNotificationFormChange} className="mt-2 w-full rounded-xl border border-gray-200 bg-white px-4 py-3 outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-100">
+                              {notificationChannels.map((option) => <option key={option} value={option}>{option}</option>)}
+                            </select>
+                          </label>
+
+                          <label className="text-sm font-medium text-gray-700">
+                            Priority
+                            <select name="priority" value={notificationForm.priority} onChange={handleNotificationFormChange} className="mt-2 w-full rounded-xl border border-gray-200 bg-white px-4 py-3 outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-100">
+                              {notificationPriorities.map((option) => <option key={option} value={option}>{option}</option>)}
+                            </select>
+                          </label>
+
+                          <label className="text-sm font-medium text-gray-700">
+                            Initial status
+                            <select name="status" value={notificationForm.status} onChange={handleNotificationFormChange} className="mt-2 w-full rounded-xl border border-gray-200 bg-white px-4 py-3 outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-100">
+                              {notificationStatuses.map((option) => <option key={option} value={option}>{option}</option>)}
+                            </select>
+                          </label>
+                        </div>
+                      </div>
+
+                      <div className="rounded-2xl border border-gray-200 bg-gray-50 p-5">
+                        <h4 className="text-sm font-bold uppercase tracking-[0.2em] text-gray-700">Guidance</h4>
+                        <div className="mt-4 space-y-3 text-sm text-gray-600">
+                          <p>Email notifications require a recipient email address.</p>
+                          <p>SMS notifications require a recipient phone number.</p>
+                          <p>PUSH and IN_APP can be created and tracked, but direct sending depends on backend delivery support.</p>
+                        </div>
+                      </div>
+                    </div>
+                  </form>
                 </div>
 
-                <div className="grid grid-cols-1 gap-4 border-b border-gray-100 p-6 md:grid-cols-5">
-                  <div className="rounded-xl bg-slate-50 p-4"><p className="text-xs text-gray-500">Total</p><p className="mt-1 text-xl font-bold text-gray-800">{notificationSummary?.totalNotifications ?? notifications.length}</p></div>
-                  <div className="rounded-xl bg-yellow-50 p-4"><p className="text-xs text-gray-500">Queued</p><p className="mt-1 text-xl font-bold text-yellow-700">{notificationSummary?.queuedNotifications ?? 0}</p></div>
-                  <div className="rounded-xl bg-green-50 p-4"><p className="text-xs text-gray-500">Sent</p><p className="mt-1 text-xl font-bold text-green-700">{notificationSummary?.sentNotifications ?? 0}</p></div>
-                  <div className="rounded-xl bg-rose-50 p-4"><p className="text-xs text-gray-500">Failed</p><p className="mt-1 text-xl font-bold text-rose-700">{notificationSummary?.failedNotifications ?? 0}</p></div>
-                  <div className="rounded-xl bg-red-50 p-4"><p className="text-xs text-gray-500">Critical</p><p className="mt-1 text-xl font-bold text-red-700">{notificationSummary?.criticalNotifications ?? 0}</p></div>
-                </div>
+                <div className="rounded-2xl bg-white shadow-lg">
+                  <div className="grid grid-cols-1 gap-4 border-b border-gray-100 p-6 md:grid-cols-5">
+                    <div className="rounded-xl bg-slate-50 p-4"><p className="text-xs text-gray-500">Total</p><p className="mt-1 text-xl font-bold text-gray-800">{notificationSummary?.totalNotifications ?? notifications.length}</p></div>
+                    <div className="rounded-xl bg-yellow-50 p-4"><p className="text-xs text-gray-500">Queued</p><p className="mt-1 text-xl font-bold text-yellow-700">{notificationSummary?.queuedNotifications ?? 0}</p></div>
+                    <div className="rounded-xl bg-green-50 p-4"><p className="text-xs text-gray-500">Sent</p><p className="mt-1 text-xl font-bold text-green-700">{notificationSummary?.sentNotifications ?? 0}</p></div>
+                    <div className="rounded-xl bg-rose-50 p-4"><p className="text-xs text-gray-500">Failed</p><p className="mt-1 text-xl font-bold text-rose-700">{notificationSummary?.failedNotifications ?? 0}</p></div>
+                    <div className="rounded-xl bg-red-50 p-4"><p className="text-xs text-gray-500">Critical</p><p className="mt-1 text-xl font-bold text-red-700">{notificationSummary?.criticalNotifications ?? 0}</p></div>
+                  </div>
 
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">ID</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">Recipient</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">Subject</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">Channel</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">Status</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-200">
-                      {notifications.length === 0 ? (
-                        <tr><td colSpan="6" className="px-6 py-8 text-center text-sm text-gray-500">No notifications found.</td></tr>
-                      ) : notifications.map((item) => (
-                        <tr key={item.id} className="hover:bg-gray-50">
-                          <td className="px-6 py-4 text-sm font-semibold text-gray-800">#{item.id}</td>
-                          <td className="px-6 py-4 text-sm text-gray-600">
-                            <p>{item.recipientName || 'Unknown'}</p>
-                            <p className="text-xs text-gray-500">{item.recipientEmail || item.recipientPhone || 'No contact'}</p>
-                          </td>
-                          <td className="px-6 py-4 text-sm text-gray-700">{item.subject || 'No subject'}</td>
-                          <td className="px-6 py-4 text-xs font-semibold text-teal-700">{item.channel || 'N/A'}</td>
-                          <td className="px-6 py-4">
-                            <span className={`rounded-full px-3 py-1 text-xs font-medium ${item.status === 'SENT' ? 'bg-green-100 text-green-700' : item.status === 'FAILED' ? 'bg-rose-100 text-rose-700' : 'bg-yellow-100 text-yellow-700'}`}>
-                              {item.status || 'QUEUED'}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4">
-                            <div className="flex flex-wrap gap-2">
-                              <button
-                                type="button"
-                                onClick={() => triggerSendNotification(item.id)}
-                                disabled={busyId === item.id}
-                                className="rounded-md bg-blue-100 px-3 py-1 text-xs font-semibold text-blue-700 hover:bg-blue-200 disabled:opacity-50"
-                              >
-                                Send
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => changeNotificationStatus(item.id, 'QUEUED')}
-                                disabled={busyId === item.id}
-                                className="rounded-md bg-yellow-100 px-3 py-1 text-xs font-semibold text-yellow-700 hover:bg-yellow-200 disabled:opacity-50"
-                              >
-                                Mark Queued
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => changeNotificationStatus(item.id, 'FAILED')}
-                                disabled={busyId === item.id}
-                                className="rounded-md bg-rose-100 px-3 py-1 text-xs font-semibold text-rose-700 hover:bg-rose-200 disabled:opacity-50"
-                              >
-                                Mark Failed
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => removeNotification(item.id)}
-                                disabled={busyId === item.id}
-                                className="rounded-md bg-red-100 px-3 py-1 text-xs font-semibold text-red-700 hover:bg-red-200 disabled:opacity-50"
-                              >
-                                Delete
-                              </button>
-                            </div>
-                          </td>
+                  <div className="border-b border-gray-100 px-6 py-4">
+                    <h3 className="text-lg font-bold text-gray-800">Notification Queue</h3>
+                    <p className="mt-1 text-sm text-gray-500">Review created notifications, delivery status, and admin actions.</p>
+                  </div>
+
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">ID</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">Recipient</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">Subject</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">Channel</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">Status</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">Actions</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200">
+                        {notifications.length === 0 ? (
+                          <tr><td colSpan="6" className="px-6 py-8 text-center text-sm text-gray-500">No notifications found.</td></tr>
+                        ) : notifications.map((item) => (
+                          <tr key={item.id} className="hover:bg-gray-50">
+                            <td className="px-6 py-4 text-sm font-semibold text-gray-800">#{item.id}</td>
+                            <td className="px-6 py-4 text-sm text-gray-600">
+                              <p>{item.recipientName || 'Unknown'}</p>
+                              <p className="text-xs text-gray-500">{item.recipientEmail || item.recipientPhone || 'No contact'}</p>
+                            </td>
+                            <td className="px-6 py-4 text-sm text-gray-700">
+                              <p className="font-medium text-gray-800">{item.subject || 'No subject'}</p>
+                              <p className="mt-1 text-xs text-gray-500">{item.templateCode || 'No template code'}</p>
+                            </td>
+                            <td className="px-6 py-4 text-xs font-semibold text-teal-700">
+                              <p>{item.channel || 'N/A'}</p>
+                              <p className="mt-1 text-[11px] text-gray-500">{item.priority || 'NORMAL'}</p>
+                            </td>
+                            <td className="px-6 py-4">
+                              <span className={`rounded-full px-3 py-1 text-xs font-medium ${notificationStatusClass(item.status)}`}>
+                                {item.status || 'QUEUED'}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4">
+                              <div className="flex flex-wrap gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => triggerSendNotification(item.id)}
+                                  disabled={busyId === item.id}
+                                  className="rounded-md bg-blue-100 px-3 py-1 text-xs font-semibold text-blue-700 hover:bg-blue-200 disabled:opacity-50"
+                                >
+                                  Send
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => changeNotificationStatus(item.id, 'QUEUED')}
+                                  disabled={busyId === item.id}
+                                  className="rounded-md bg-yellow-100 px-3 py-1 text-xs font-semibold text-yellow-700 hover:bg-yellow-200 disabled:opacity-50"
+                                >
+                                  Mark Queued
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => changeNotificationStatus(item.id, 'FAILED')}
+                                  disabled={busyId === item.id}
+                                  className="rounded-md bg-rose-100 px-3 py-1 text-xs font-semibold text-rose-700 hover:bg-rose-200 disabled:opacity-50"
+                                >
+                                  Mark Failed
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => removeNotification(item.id)}
+                                  disabled={busyId === item.id}
+                                  className="rounded-md bg-red-100 px-3 py-1 text-xs font-semibold text-red-700 hover:bg-red-200 disabled:opacity-50"
+                                >
+                                  Delete
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               </div>
             ) : null}
